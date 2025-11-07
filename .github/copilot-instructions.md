@@ -140,6 +140,13 @@ Signing is DISABLED by default. First builds succeed immediately. Enable later f
 - Numbered scripts: `10-build.sh`, `20-chrome.sh`, `30-cosmic.sh`
 - Check @bootc-dev for container best practices
 
+### Documentation Verification
+**ALWAYS check official documentation before making changes to package managers and application formats.**
+- Check @homebrew documentation for Brewfile syntax and package availability
+- Check @flatpak and @flathub documentation for Flatpak app IDs and formats
+- Verify current best practices as they may change over time (e.g., built-in taps, deprecated formats)
+- When in doubt, consult the official documentation rather than making assumptions
+
 ### Branch Strategy
 - **main** = Production releases ONLY. Never push directly. Builds `:stable` images.
 - **Conventional Commits** = REQUIRED. `feat:`, `fix:`, `chore:`, etc.

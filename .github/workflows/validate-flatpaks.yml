@@ -5,7 +5,7 @@ permissions:
 on:
   pull_request:
     paths:
-      - "custom/flatpak/**"
+      - "custom/flatpaks/**"
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -22,15 +22,18 @@ jobs:
       - name: Validate Flatpaks
         shell: bash
         run: |
-          echo "Validating flatpak files in custom/flatpak/ directory..."
+          echo "Validating flatpak files in custom/flatpaks/ directory..."
 
           set -xeuo pipefail
 
-          find "custom/flatpak" -iname '*\.list*' -print0 | \
+          find "custom/flatpaks" -iname '*.preinstall' -print0 | \
             while IFS= read -r -d '' flatpaks_file ; do \
               echo "::group:: ===$(basename "$flatpaks_file")==="
-              grep -v "#.*" "$flatpaks_file" | grep -v "^$" | \
+              # Extract Flatpak app IDs from [Flatpak Preinstall <APP_ID>] sections
+              grep "^\[Flatpak Preinstall " "$flatpaks_file" | \
+                sed 's/^\[Flatpak Preinstall \(.*\)\]$/\1/' | \
                 while read -r flatpak ; do \
+                  echo "Checking: ${flatpak}"
                   flatpak remote-info --user flathub "${flatpak}"
                 done
               echo "::endgroup::"

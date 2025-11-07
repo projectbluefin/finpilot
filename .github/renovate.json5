@@ -7,29 +7,29 @@
   // Do not rebase when the default branch is updated
   "rebaseWhen": "never",
 
-  customManagers: [
+  "customManagers": [
     {
-      customType: 'regex',
-      description: 'Match container images in Justfile with tag and digest',
-      fileMatch: [
-        '^Justfile$',
+      "customType": "regex",
+      "description": "Match container images in Justfile with tag and digest",
+      "fileMatch": [
+        "^Justfile$",
       ],
-      matchStrings: [
-        '(?<justName>.+?)\\s:=\\s(?:env\\(.+?,\\s)?["\'](?<packageName>\\S+?):(?<currentValue>\\S+?)@(?<currentDigest>sha256:[a-f0-9]+?)["\']\\)?',
+      "matchStrings": [
+        "(?<justName>.+?)\\s:=\\s(?:env\\(.+?,\\s)?[\"'](?<packageName>\\S+?):(?<currentValue>\\S+?)@(?<currentDigest>sha256:[a-f0-9]+?)[\"']\\)?",
       ],
-      datasourceTemplate: 'docker',
+      "datasourceTemplate": "docker",
     },
     {
-      customType: 'regex',
-      description: 'Match container images in Justfile run_args without tag or digest',
-      fileMatch: [
-        '^Justfile$',
+      "customType": "regex",
+      "description": "Match container images in Justfile run_args without tag or digest",
+      "fileMatch": [
+        "^Justfile$",
       ],
-      matchStrings: [
-        'run_args\\+=\\((?<packageName>[a-zA-Z0-9._:/-]+)\\)',
+      "matchStrings": [
+        "run_args\\+=\\((?<packageName>[a-zA-Z0-9._:/-]+)\\)",
       ],
-      datasourceTemplate: 'docker',
-      versioningTemplate: 'docker',
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker",
     },
   ],
 
