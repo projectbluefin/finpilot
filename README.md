@@ -242,8 +242,6 @@ The template imports files from these OCI containers at build time:
 ```dockerfile
 COPY --from=ghcr.io/ublue-os/base-main:latest /system_files /oci/base
 COPY --from=ghcr.io/projectbluefin/common:latest /system_files /oci/common
-COPY --from=ghcr.io/projectbluefin/branding:latest /system_files /oci/branding
-COPY --from=ghcr.io/ublue-os/artwork:latest /system_files /oci/artwork
 COPY --from=ghcr.io/ublue-os/brew:latest /system_files /oci/brew
 ```
 
