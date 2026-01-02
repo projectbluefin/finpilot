@@ -216,7 +216,7 @@ After building your bootc image, add a rechunk step before pushing to the regist
       -v /var/lib/containers:/var/lib/containers \
       --entrypoint /usr/libexec/bootc-base-imagectl \
       "localhost/${IMAGE_NAME}:${DEFAULT_TAG}" \
-      rechunk --max-layers 67 \
+      rechunk --max-layers 96 \
       "localhost/${IMAGE_NAME}:${DEFAULT_TAG}" \
       "localhost/${IMAGE_NAME}:${DEFAULT_TAG}"
 
@@ -248,11 +248,6 @@ Alternative approach using a temporary tag for clarity:
 - The second image reference is the destination (output)
   - When using the same reference for both, the image is rechunked in-place
   - You can also use different tags (e.g., `-rechunked` suffix) and then retag if preferred
-
-**Benefits:**
-- **Smaller updates**: 5-10x reduction in update size by removing replaced files from previous layers
-- **Better resumability**: Evenly sized layers improve download resume capability
-- **Optimized layer distribution**: Files are reorganized for efficient updates
 
 **References:**
 - [CoreOS rpm-ostree build-chunked-oci documentation](https://coreos.github.io/rpm-ostree/build-chunked-oci/)
