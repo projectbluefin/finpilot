@@ -23,6 +23,7 @@
 #
 # 1. Context Stage (ctx) - Combines resources from:
 #    - Local build scripts and custom files
+#    - @ublue-os/base-main - Base system configuration
 #    - @projectbluefin/common - Desktop configuration shared with Aurora
 #    - @projectbluefin/branding - Branding assets
 #    - @ublue-os/artwork - Artwork shared with Aurora and Bazzite
@@ -42,13 +43,14 @@ COPY build /build
 COPY custom /custom
 # Copy from OCI containers to distinct subdirectories to avoid conflicts
 # Note: Renovate can automatically update these :latest tags to SHA-256 digests for reproducibility
+COPY --from=ghcr.io/ublue-os/base-main:latest /system_files /oci/base
 COPY --from=ghcr.io/projectbluefin/common:latest /system_files /oci/common
 COPY --from=ghcr.io/projectbluefin/branding:latest /system_files /oci/branding
 COPY --from=ghcr.io/ublue-os/artwork:latest /system_files /oci/artwork
 COPY --from=ghcr.io/ublue-os/brew:latest /system_files /oci/brew
 
 # Base Image - silverblue-main or CentOS Stream
-FROM ghcr.io/ublue-os/silverblue-main:42
+FROM ghcr.io/ublue-os/silverblue-main:latest
 
 ## Alternative base images (uncomment to use):
 # For CentOS Stream based image:

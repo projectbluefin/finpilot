@@ -241,7 +241,7 @@ This template follows the **multi-stage build architecture** from @projectbluefi
 - **@ublue-os/brew** - Homebrew integration
 
 **Stage 2: Base Image** - Default options:
-- `ghcr.io/ublue-os/silverblue-main:42` (Fedora-based, default)
+- `ghcr.io/ublue-os/silverblue-main:latest` (Fedora-based, default)
 - `quay.io/centos-bootc/centos-bootc:stream10` (CentOS-based alternative)
 
 ### Benefits of This Architecture
@@ -256,6 +256,7 @@ This template follows the **multi-stage build architecture** from @projectbluefi
 The template imports files from these OCI containers at build time:
 
 ```dockerfile
+COPY --from=ghcr.io/ublue-os/base-main:latest /system_files /oci/base
 COPY --from=ghcr.io/projectbluefin/common:latest /system_files /oci/common
 COPY --from=ghcr.io/projectbluefin/branding:latest /system_files /oci/branding
 COPY --from=ghcr.io/ublue-os/artwork:latest /system_files /oci/artwork
@@ -263,6 +264,7 @@ COPY --from=ghcr.io/ublue-os/brew:latest /system_files /oci/brew
 ```
 
 Your build scripts can access these files at:
+- `/ctx/oci/base/` - Base system configuration
 - `/ctx/oci/common/` - Shared desktop configuration
 - `/ctx/oci/branding/` - Branding assets
 - `/ctx/oci/artwork/` - Artwork files

@@ -319,15 +319,16 @@ FROM scratch AS ctx
 COPY build /build
 COPY custom /custom
 # Import from OCI containers - Renovate updates :latest to SHA-256 digests
+COPY --from=ghcr.io/ublue-os/base-main:latest /system_files /oci/base
 COPY --from=ghcr.io/projectbluefin/common:latest /system_files /oci/common
 COPY --from=ghcr.io/projectbluefin/branding:latest /system_files /oci/branding
 COPY --from=ghcr.io/ublue-os/artwork:latest /system_files /oci/artwork
 COPY --from=ghcr.io/ublue-os/brew:latest /system_files /oci/brew
 ```
 
-**Stage 2: Base Image - Line 51**
+**Stage 2: Base Image - Line 52**
 ```dockerfile
-FROM ghcr.io/ublue-os/silverblue-main:42  # Default (Fedora-based)
+FROM ghcr.io/ublue-os/silverblue-main:latest  # Default (Fedora-based)
 # OR
 FROM quay.io/centos-bootc/centos-bootc:stream10  # CentOS-based
 ```
@@ -345,6 +346,7 @@ FROM quay.io/fedora/fedora-bootc:42       # Upstream Fedora
 **Renovate**: Base image SHA and OCI container tags are auto-updated by Renovate bot every 6 hours (see `.github/renovate.json5`)
 
 **OCI Container Resources:**
+- **@ublue-os/base-main** - Base system configuration
 - **@projectbluefin/common** - Desktop configuration shared with Aurora
 - **@projectbluefin/branding** - Branding assets
 - **@ublue-os/artwork** - Artwork shared with Aurora and Bazzite
@@ -353,6 +355,7 @@ FROM quay.io/fedora/fedora-bootc:42       # Upstream Fedora
 **File Locations in Build Scripts:**
 - Local build scripts: `/ctx/build/`
 - Local custom files: `/ctx/custom/`
+- Base files: `/ctx/oci/base/`
 - Common files: `/ctx/oci/common/`
 - Branding files: `/ctx/oci/branding/`
 - Artwork files: `/ctx/oci/artwork/`
