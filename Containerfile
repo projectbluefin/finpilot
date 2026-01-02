@@ -40,10 +40,12 @@ FROM scratch AS ctx
 
 COPY build /build
 COPY custom /custom
-COPY --from=ghcr.io/projectbluefin/common:latest /system_files/shared /custom
-COPY --from=ghcr.io/projectbluefin/branding:latest /system_files /custom
-COPY --from=ghcr.io/ublue-os/artwork:latest /system_files /custom
-COPY --from=ghcr.io/ublue-os/brew:latest /system_files /custom
+# Copy from OCI containers to distinct subdirectories to avoid conflicts
+# Note: Renovate can automatically update these :latest tags to SHA digests for reproducibility
+COPY --from=ghcr.io/projectbluefin/common:latest /system_files /oci/common
+COPY --from=ghcr.io/projectbluefin/branding:latest /system_files /oci/branding
+COPY --from=ghcr.io/ublue-os/artwork:latest /system_files /oci/artwork
+COPY --from=ghcr.io/ublue-os/brew:latest /system_files /oci/brew
 
 # Base Image - silverblue-main or CentOS Stream
 FROM ghcr.io/ublue-os/silverblue-main:42
@@ -77,10 +79,10 @@ FROM ghcr.io/ublue-os/silverblue-main:42
 ## The following RUN directive mounts the ctx stage which includes:
 ##   - Local build scripts from /build
 ##   - Local custom files from /custom
-##   - Files from @projectbluefin/common (shared Bluefin configuration)
-##   - Files from @projectbluefin/branding (branding assets)
-##   - Files from @ublue-os/artwork (wallpapers and artwork)
-##   - Files from @ublue-os/brew (Homebrew integration)
+##   - Files from @projectbluefin/common at /oci/common
+##   - Files from @projectbluefin/branding at /oci/branding
+##   - Files from @ublue-os/artwork at /oci/artwork
+##   - Files from @ublue-os/brew at /oci/brew
 ## Scripts are run in numerical order (10-build.sh, 20-example.sh, etc.)
 
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
