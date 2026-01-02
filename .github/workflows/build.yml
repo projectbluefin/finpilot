@@ -118,48 +118,7 @@ jobs:
           labels: ${{ steps.metadata.outputs.labels }}
           oci: false
 
-      # Rechunk (OPTIONAL): Rechunker optimizes container image layers for better resumability and fixes some distribution errors.
-      # It doesn't make downloads faster but provides more reliable image distribution.
-      # To enable rechunking:
-      #   1. Uncomment the "Run Rechunker" step below
-      #   2. Uncomment the "Load in podman and tag" step below
-      #   3. Comment out or remove the "Tag for registry" step that follows this section
-      # Documentation: https://github.com/hhd-dev/rechunk
-      
-      # - name: Run Rechunker
-      #   id: rechunk
-      #   uses: hhd-dev/rechunk@5fbe1d3a639615d2548d83bc888360de6267b1a2 # v1.2.4
-      #   with:
-      #     rechunk: 'ghcr.io/hhd-dev/rechunk:v1.2.4'
-      #     ref: "${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}"
-      #     prev-ref: "${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}"
-      #     version: "${{ env.DEFAULT_TAG }}"
-      #     labels: |
-      #       io.artifacthub.package.readme-url=https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}/${{ github.sha }}/README.md
-      #       org.opencontainers.image.created=${{ steps.date.outputs.date }}
-      #       org.opencontainers.image.description=${{ env.IMAGE_DESC }}
-      #       org.opencontainers.image.documentation=https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}/${{ github.sha }}/README.md
-      #       org.opencontainers.image.source=https://github.com/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}/blob/${{ github.sha }}/Containerfile
-      #       org.opencontainers.image.title=${{ env.IMAGE_NAME }}
-      #       org.opencontainers.image.url=https://github.com/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}/tree/${{ github.sha }}
-      #       org.opencontainers.image.vendor=${{ github.repository_owner }}
-      #       org.opencontainers.image.version=${{ env.DEFAULT_TAG }}.{{date 'YYYYMMDD'}}
-      #       io.artifacthub.package.deprecated=false
-      #       io.artifacthub.package.keywords=${{ env.IMAGE_KEYWORDS }}
-      #       io.artifacthub.package.license=Apache-2.0
-      #       io.artifacthub.package.logo-url=${{ env.IMAGE_LOGO_URL }}
-      #       io.artifacthub.package.prerelease=false
-      #       containers.bootc=1
-
-      # - name: Load in podman and tag
-      #   run: |
-      #     IMAGE=$(podman pull ${{ steps.rechunk.outputs.ref }})
-      #     sudo rm -rf ${{ steps.rechunk.outputs.output }}
-      #     for tag in ${{ steps.metadata.outputs.tags }}; do
-      #       podman tag $IMAGE ${{ env.IMAGE_NAME }}:$tag
-      #     done
-
-      # Tag for registry (remove this step if using rechunker above)
+      # Tag for registry
       - name: Tag for registry
         run: |
           for tag in ${{ steps.metadata.outputs.tags }}; do

@@ -31,6 +31,3 @@ cosign generate-key-pair
 # Uncomment signing in .github/workflows/build.yml
 ```
 
-### Enable Rechunker
-- Uncomment rechunker steps in `.github/workflows/build.yml`
-

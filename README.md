@@ -28,7 +28,7 @@ Use @projectbluefin/finpilot as a template, name the OS the repository name. Ens
 - Validates your files on pull requests so you never break a build:
   - Brewfile, Justfile, ShellCheck, Renovate config, and it'll even check to make sure the flatpak you add exists on FlatHub
 - Production Grade Features
-  - Container signing, SBOM Generation, and layer rechunking.
+  - Container signing and SBOM Generation
   - See checklist below to enable these as they take some manual configuration
 
 ### Homebrew Integration
@@ -41,13 +41,6 @@ Use @projectbluefin/finpilot as a template, name the OS the repository name. Ens
 - Ship your favorite flatpaks
 - Automatically installed on first boot after user setup
 - See [custom/flatpaks/README.md](custom/flatpaks/README.md) for details
-
-### Rechunker
-- Optimizes container image layer distribution for better download resumability
-- Based on [hhd-dev/rechunk](https://github.com/hhd-dev/rechunk) v1.2.4
-- Disabled by default for faster initial builds
-- Enable in `.github/workflows/build.yml` by uncommenting the rechunker steps (see comments in file)
-- Recommended for production deployments after initial testing
 
 ### ujust Commands
 - User-friendly command shortcuts via `ujust`
@@ -180,18 +173,6 @@ Ready to take your custom OS to production? Enable these features for enhanced s
   - See "Optional: Enable Image Signing" section above for setup instructions
   - Status: **Disabled by default** to allow immediate testing
 
-- [ ] **Enable Rechunker** (Recommended)
-  - Optimizes image layer distribution for better download resumability
-  - Improves reliability for users with unstable connections
-  - To enable:
-    1. Edit `.github/workflows/build.yml`
-    2. Find the "Rechunk (OPTIONAL)" section around line 121
-    3. Uncomment the "Run Rechunker" step
-    4. Uncomment the "Load in podman and tag" step
-    5. Comment out the "Tag for registry" step that follows
-    6. Commit and push
-  - Status: **Disabled by default** for faster initial builds
-
 - [ ] **Enable SBOM Attestation** (Recommended)
   - Generates Software Bill of Materials for supply chain security
   - Provides transparency about what's in your image
@@ -209,7 +190,6 @@ Ready to take your custom OS to production? Enable these features for enhanced s
 Your workflow will:
 - Sign all images with your key
 - Generate and attach SBOMs
-- Optimize layers for better distribution
 - Provide full supply chain transparency
 
 Users can verify your images with:
