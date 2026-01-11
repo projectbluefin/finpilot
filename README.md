@@ -67,13 +67,14 @@ Click "Use this template" to create a new repository from this template.
 
 ### 2. Rename the Project
 
-Important: Change `finpilot` to your repository name in these 5 files:
+Important: Change `finpilot` to your repository name in these 6 files:
 
-1. `Containerfile` (line 9): `# Name: your-repo-name`
-2. `Justfile` (line 1): `export image_name := "your-repo-name"`
+1. `Containerfile` (line 4): `# Name: your-repo-name`
+2. `Justfile` (line 1): `export image_name := env("IMAGE_NAME", "your-repo-name")`
 3. `README.md` (line 1): `# your-repo-name`
 4. `artifacthub-repo.yml` (line 5): `repositoryID: your-repo-name`
 5. `custom/ujust/README.md` (~line 175): `localhost/your-repo-name:stable`
+6. `.github/workflows/clean.yml` (line 23): `packages: your-repo-name`
 
 ### 3. Enable GitHub Actions
 
