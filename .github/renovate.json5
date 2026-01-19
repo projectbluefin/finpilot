@@ -11,7 +11,7 @@
     {
       customType: 'regex',
       description: 'Match container images in Justfile with tag and digest',
-      fileMatch: [
+      managerFilePatterns: [
         '^Justfile$',
       ],
       matchStrings: [
@@ -22,11 +22,11 @@
     {
       customType: 'regex',
       description: 'Match container images in Justfile run_args without tag or digest',
-      fileMatch: [
+      managerFilePatterns: [
         '^Justfile$',
       ],
       matchStrings: [
-        'run_args\\+=\\((?<packageName>[a-zA-Z0-9._:/-]+)\\)',
+        'run_args\\+=\\((?<packageName>[a-zA-Z0-9._:/-]+):?(?<currentValue>\\S+?)\\)',
       ],
       datasourceTemplate: 'docker',
       versioningTemplate: 'docker',
