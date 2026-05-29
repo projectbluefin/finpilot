@@ -87,9 +87,9 @@ Note: Image signing is disabled by default. Your images will build successfully 
 
 ### 4. Customize Your Image
 
-Choose your base image in `Containerfile` (line 23):
+Choose your base image in `Containerfile` (line 48):
 ```dockerfile
-FROM ghcr.io/ublue-os/bluefin:stable
+FROM ghcr.io/ublue-os/silverblue-main:latest
 ```
 
 Add your packages in `build/10-build.sh`:
