@@ -146,9 +146,12 @@ jobs:
       #     DEFAULT_TAG: ${{ env.DEFAULT_TAG }}
       #     SYFT_CMD: ${{ steps.setup-syft.outputs.cmd }}
       #   run: |
+      #     # Save image to tar so Syft can access it (podman rootless has no socket)
+      #     IMAGE_TAR="$(mktemp -d)/image.tar"
+      #     podman save -o "$IMAGE_TAR" ${IMAGE}:${DEFAULT_TAG}
       #     OUTPUT_PATH="$(mktemp -d)/sbom.json"
       #     export SYFT_PARALLELISM=$(($(nproc)*2))
-      #     $SYFT_CMD ${IMAGE}:${DEFAULT_TAG} -o spdx-json=${OUTPUT_PATH}
+      #     $SYFT_CMD docker-archive:$IMAGE_TAR -o spdx-json=${OUTPUT_PATH}
       #     echo "OUTPUT_PATH=${OUTPUT_PATH}" >> $GITHUB_OUTPUT
 
       # These `if` statements are so that pull requests for your custom images do not make it publish any packages under your name without you knowing
