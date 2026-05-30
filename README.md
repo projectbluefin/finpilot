@@ -347,3 +347,18 @@ This template provides security features for production use:
 - Build provenance tracking
 
 These security features are disabled by default to allow immediate testing. When you're ready for production, see the "Love Your Image? Let's Go to Production" section above to enable them.
+
+
+## Troubleshooting
+
+### Flatpaks not preinstalled after bootc switch (fixes #49)
+Flatpaks are installed on first boot via `flatpak-preinstall.service`, not during `bootc switch`. Ensure:
+- Internet is available on first boot
+- `flatpak-preinstall.service` completes (`systemctl status flatpak-preinstall.service`)
+- Wait until the service finishes before checking for flatpaks
+
+### flatpak-preinstall errors about adw-gtk3 runtimes (fixes #30)
+The `adw-gtk3-dark` runtime is not available on Flathub. These warnings are cosmetic and do not prevent other flatpaks from installing. To suppress, remove `adw-gtk3-dark` from your flatpak list in `custom/flatpaks/`.
+
+### Homebrew not installed after bootc switch (fixes #44)
+Homebrew is installed at build time into the image. If you don't see `brew`, verify your Containerfile includes the brew stage from `projectbluefin/common`. Check `custom/brew/README.md` for setup instructions.
