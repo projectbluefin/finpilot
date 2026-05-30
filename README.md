@@ -201,10 +201,11 @@ Ready to take your custom OS to production? Enable these features for enhanced s
     2. Find the "Build Image" step
     3. Add a rechunk step after the build (see example below)
   - Status: **Not enabled by default** (optional optimization)
+  - Note: `/usr/libexec/bootc-base-imagectl` is only available on `quay.io/fedora/fedora-bootc` base images. It is **not present** on `ublue-os` base images (`ublue-os/main-nvidia`, `ublue-os/silverblue-main`, etc.). If you are using a ublue-os base image, rechunking is not currently supported. See [#54](https://github.com/projectbluefin/finpilot/issues/54) for discussion.
 
 #### Adding Image Rechunking
 
-After building your bootc image, add a rechunk step before pushing to the registry. Here's an example based on the workflow used by [zirconium-dev/zirconium](https://github.com/zirconium-dev/zirconium):
+After building your bootc image, add a rechunk step before pushing to the registry. This example uses the workflow from [zirconium-dev/zirconium](https://github.com/zirconium-dev/zirconium), which is based on `fedora-bootc`:
 
 ```yaml
 - name: Build image
