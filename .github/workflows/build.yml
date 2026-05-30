@@ -4,13 +4,14 @@ on:
   pull_request:
     branches:
       - main
-  schedule:
-    - cron: '05 10 * * *'  # 10:05am UTC everyday
+      - stable
   push:
     branches:
       - main
+      - stable
     paths-ignore:
       - '**/README.md'
+  merge_group:
   workflow_dispatch:
 
 env:
@@ -20,6 +21,8 @@ env:
   IMAGE_NAME: "${{ github.event.repository.name }}"  # output image name, usually same as repo name
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"  # do not edit
   DEFAULT_TAG: "stable"
+  PRODUCTION_BRANCH: "stable"
+  TESTING_BRANCH: "main"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}-${{ inputs.brand_name}}-${{ inputs.stream_name }}
@@ -41,6 +44,16 @@ jobs:
           # Lowercase the image uri
           echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}" >> ${GITHUB_ENV}
           echo "IMAGE_NAME=${IMAGE_NAME,,}" >> ${GITHUB_ENV}
+
+      - name: Determine image tag
+        id: determine-tag
+        run: |
+          if [ "${GITHUB_REF_NAME}" != "${PRODUCTION_BRANCH}" ]; then
+            echo "DEFAULT_TAG=${DEFAULT_TAG}-testing" >> ${GITHUB_ENV}
+            echo "Building testing image: ${DEFAULT_TAG}-testing"
+          else
+            echo "Building production image: ${DEFAULT_TAG}"
+          fi
 
       # These stage versions are pinned by https://github.com/renovatebot/renovate
       - name: Checkout
@@ -158,7 +171,7 @@ jobs:
       # They also check if the runner is on the default branch so that things like the merge queue (if you enable it), are going to work
       - name: Login to GitHub Container Registry
         uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
-        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        if: github.event_name != 'pull_request'
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -166,7 +179,7 @@ jobs:
 
       - name: Push To GHCR
         uses: redhat-actions/push-to-registry@5ed88d269cf581ea9ef6dd6806d01562096bee9c # v2
-        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        if: github.event_name != 'pull_request'
         id: push
         env:
           REGISTRY_USER: ${{ github.actor }}
@@ -183,10 +196,10 @@ jobs:
 
       # - name: Install Cosign
       #   uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
-      #   if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+      #   if: github.event_name != 'pull_request'
       #
       # - name: Sign container image
-      #   if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+      #   if: github.event_name != 'pull_request'
       #   run: |
       #     IMAGE_FULL="${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}"
       #     for tag in ${{ steps.metadata.outputs.tags }}; do
@@ -206,7 +219,7 @@ jobs:
       # Documentation: https://slsa.dev/spec/v1.0/requirements#provenance-available
 
       # - name: Add SBOM Attestation
-      #   if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+      #   if: github.event_name != 'pull_request'
       #   env:
       #     IMAGE: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}
       #     DIGEST: ${{ steps.push.outputs.digest }}
