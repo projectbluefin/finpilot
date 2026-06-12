@@ -100,6 +100,8 @@ jobs:
         uses: nick-fields/retry@v4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          DEFAULT_TAG: ${{ env.DEFAULT_TAG }}
         with:
           timeout_minutes: 120
           max_attempts: 3
