@@ -1,0 +1,217 @@
+---
+name: Build and Push Image
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - Containerfile
+      - Justfile
+      - build/**
+      - custom/**
+      - iso/**
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "**.md"
+      - ".github/workflows/*validate*.yml"
+  schedule:
+    - cron: '05 10 * * *'  # 10:05am UTC everyday
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and push image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      security-events: write
+
+    steps:
+      - name: Prepare environment
+        run: |
+          echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}" >> ${GITHUB_ENV}
+          echo "IMAGE_NAME=${IMAGE_NAME,,}" >> ${GITHUB_ENV}
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup runner
+        uses: projectbluefin/actions/bootc-build/setup-runner@v1
+        with:
+          storage-backend: btrfs
+          update-podman: "true"
+          install-tools: '["just"]'
+
+      - name: Restore DNF cache
+        id: dnf-cache-restore
+        uses: projectbluefin/actions/bootc-build/dnf-cache@v1
+        with:
+          action: restore
+          cache-name: ${{ env.IMAGE_NAME }}
+
+      - name: Get current date
+        id: date
+        run: |
+          echo "date=$(date -u +%Y\-%m\-%d\T%H\:%M\:%S\Z)" >> $GITHUB_OUTPUT
+
+      - name: Image metadata
+        uses: docker/metadata-action@v5
+        id: metadata
+        with:
+          images: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ env.DEFAULT_TAG }}
+            type=raw,value=${{ env.DEFAULT_TAG }}.{{date 'YYYYMMDD'}}
+            type=raw,value={{date 'YYYYMMDD'}}
+            type=sha,enable=${{ github.event_name == 'pull_request' }}
+            type=ref,event=pr
+          labels: |
+            io.artifacthub.package.readme-url=https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}/${{ github.sha }}/README.md
+            org.opencontainers.image.created=${{ steps.date.outputs.date }}
+            org.opencontainers.image.description=${{ env.IMAGE_DESC }}
+            org.opencontainers.image.documentation=https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}/${{ github.sha }}/README.md
+            org.opencontainers.image.source=https://github.com/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}/blob/${{ github.sha }}/Containerfile
+            org.opencontainers.image.title=${{ env.IMAGE_NAME }}
+            org.opencontainers.image.url=https://github.com/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}/tree/${{ github.sha }}
+            org.opencontainers.image.vendor=${{ github.repository_owner }}
+            org.opencontainers.image.version=${{ env.DEFAULT_TAG }}.{{date 'YYYYMMDD'}}
+            io.artifacthub.package.deprecated=false
+            io.artifacthub.package.keywords=${{ env.IMAGE_KEYWORDS }}
+            io.artifacthub.package.license=Apache-2.0
+            io.artifacthub.package.logo-url=${{ env.IMAGE_LOGO_URL }}
+            io.artifacthub.package.prerelease=false
+            containers.bootc=1
+          sep-tags: " "
+          sep-annotations: " "
+
+      - name: Build image
+        id: build-image
+        uses: nick-fields/retry@v4
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          timeout_minutes: 120
+          max_attempts: 3
+          retry_wait_seconds: 300
+          command: |
+            sudo -E "$(command -v just)" build
+
+      - name: Save DNF cache
+        if: always() && !cancelled()
+        uses: projectbluefin/actions/bootc-build/dnf-cache@v1
+        with:
+          action: save
+          cache-name: ${{ env.IMAGE_NAME }}
+          allow-write: ${{ github.event_name != 'pull_request' && 'true' || 'false' }}
+
+      - name: Export image for scanning
+        shell: bash
+        run: |
+          set -eoux pipefail
+          sudo podman save --format docker-archive \
+            -o /tmp/scan-image.tar \
+            "localhost/${IMAGE_NAME}:${DEFAULT_TAG}"
+
+      - name: Scan image for vulnerabilities
+        uses: projectbluefin/actions/bootc-build/scan-image@v1
+        with:
+          image: localhost/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}
+          input: /tmp/scan-image.tar
+          severity-threshold: CRITICAL
+          exit-code: '0'  # Non-blocking: CVEs reported via SARIF, never gate builds
+          create-issue: false
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to GitHub Container Registry
+        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push to GHCR
+        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        id: push
+        uses: projectbluefin/actions/bootc-build/push-image@v1
+        with:
+          image-name: ${{ env.IMAGE_NAME }}
+          tags: ${{ steps.metadata.outputs.tags }}
+          default-tag: ${{ env.DEFAULT_TAG }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # OPTIONAL: Image Signing with Cosign (keyless OIDC)
+      # Signing is disabled by default. To enable, uncomment the block below.
+      # Requires 'id-token: write' permission (already granted in this job).
+
+      # - name: Sign and publish
+      #   if: github.event_name != 'pull_request'
+      #   continue-on-error: true  # Never block image publishing
+      #   uses: projectbluefin/actions/bootc-build/sign-and-publish@v1
+      #   with:
+      #     image: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}
+      #     digest: ${{ steps.push.outputs.digest }}
+      #     signing-mode: keyless
+      #     generate-sbom: true
+      #     push-attestation: true
+      #     github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Export image to OCI dir (PR only)
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          mkdir -p "${IMAGE_NAME}_build"
+          sudo podman save --format oci-dir -o "${IMAGE_NAME}_build" "${IMAGE_NAME}:${DEFAULT_TAG}"
+
+      - name: Upload OCI dir as artifact
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.IMAGE_NAME }}-build
+          path: ${{ env.IMAGE_NAME }}_build
+          if-no-files-found: warn
+          retention-days: 1
+
+      - name: PR testing instructions
+        if: github.event_name == 'pull_request'
+        run: |
+          {
+            echo "### Test this PR build"
+            echo ""
+            echo "Download the \`.oci\` artifact, unzip it, then:"
+            echo '```bash'
+            echo "sudo bootc switch --transport oci /absolute/path/to/${{ env.IMAGE_NAME }}_build"
+            echo '```'
+            echo "To go back:"
+            echo '```bash'
+            echo "sudo bootc switch ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build telemetry summary
+        if: always()
+        shell: bash
+        run: |
+          IMAGE_SIZE=$(sudo podman image inspect "localhost/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}" \
+            --format '{{.Size}}' 2>/dev/null || echo "0")
+          IMAGE_SIZE_MB=$(( IMAGE_SIZE / 1024 / 1024 ))
+          LAYER_COUNT=$(sudo podman image inspect "localhost/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}" \
+            --format '{{len .RootFS.Layers}}' 2>/dev/null || echo "?")
+
+          {
+            echo "## Build Telemetry: ${{ env.IMAGE_NAME }}"
+            echo ""
+            echo "**Image size (uncompressed):** ${IMAGE_SIZE_MB} MB"
+            echo "**Layer count:** ${LAYER_COUNT}"
+          } >> "$GITHUB_STEP_SUMMARY"
