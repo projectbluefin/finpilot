@@ -38,8 +38,8 @@
 # These ARGs are populated by the build pipeline for reproducibility.
 # Pass as a single ref (image:tag or image:tag@sha256:...) so an empty digest
 # does not produce the invalid syntax "image:tag@" on local builds.
-ARG COMMON_IMAGE_REF="ghcr.io/projectbluefin/common:latest"
-ARG BREW_IMAGE_REF="ghcr.io/ublue-os/brew:latest"
+ARG COMMON_IMAGE_REF="ghcr.io/projectbluefin/common:latest@sha256:46d1e45dde17f038b3f371bc5f4bbd40908f372d22c848bab07de38fcd36c4fa"
+ARG BREW_IMAGE_REF="ghcr.io/ublue-os/brew:latest@sha256:5c5b6dea4b9faaab4d6fa81d7fc4f37f218c8a75a0839c72ae70b268bfdf4b0f"
 ARG FEDORA_MAJOR_VERSION="44"
 ARG BASE_IMAGE="quay.io/fedora-ostree-desktops/silverblue"
 ARG BASE_IMAGE_REF="${BASE_IMAGE}:${FEDORA_MAJOR_VERSION}"
