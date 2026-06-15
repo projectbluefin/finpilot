@@ -81,7 +81,7 @@ jobs:
         shell: bash
         env:
           # renovate: datasource=github-releases depName=mikefarah/yq
-          YQ_VERSION: "v4.44.3"
+          YQ_VERSION: "v4.53.3"
         run: |
           sudo wget -qO /usr/local/bin/yq \
             "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64"
