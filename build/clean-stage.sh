@@ -26,14 +26,14 @@ find "${CLEAN_ROOT}/var/cache"/* -maxdepth 0 -type d \! -name libdnf5 \! -name r
 # themselves. Buildah may have bind mounts in these paths during RUN, so
 # replacing the mountpoint can fail with EBUSY.
 for runtime_dir in tmp boot; do
-    mkdir -p "${CLEAN_ROOT:?}/${runtime_dir}"
-    find "${CLEAN_ROOT:?}/${runtime_dir}" -mindepth 1 -maxdepth 1 -print0 |
-        while IFS= read -r -d '' entry; do
-            if mountpoint -q "${entry}" 2>/dev/null; then
-                continue
-            fi
-            rm -rf "${entry}"
-        done
+	mkdir -p "${CLEAN_ROOT:?}/${runtime_dir}"
+	find "${CLEAN_ROOT:?}/${runtime_dir}" -mindepth 1 -maxdepth 1 -print0 |
+		while IFS= read -r -d '' entry; do
+			if mountpoint -q "${entry}" 2>/dev/null; then
+				continue
+			fi
+			rm -rf "${entry}"
+		done
 done
 
 # /run can contain nested bind mounts created by the build container. Walk it
@@ -41,15 +41,15 @@ done
 # mounted files and any directories that still contain them alone.
 mkdir -p "${CLEAN_ROOT:?}/run"
 find "${CLEAN_ROOT:?}/run" -mindepth 1 -depth -print0 |
-    while IFS= read -r -d '' entry; do
-        if mountpoint -q "${entry}" 2>/dev/null; then
-            continue
-        fi
-        if [[ -d "${entry}" ]]; then
-            rmdir "${entry}" 2>/dev/null || true
-            continue
-        fi
-        rm -f "${entry}"
-    done
+	while IFS= read -r -d '' entry; do
+		if mountpoint -q "${entry}" 2>/dev/null; then
+			continue
+		fi
+		if [[ -d "${entry}" ]]; then
+			rmdir "${entry}" 2>/dev/null || true
+			continue
+		fi
+		rm -f "${entry}"
+	done
 
 echo "::endgroup::"

@@ -410,6 +410,6 @@ Flatpaks are installed on first boot via `flatpak-preinstall.service`, not durin
 
 The `adw-gtk3-dark` runtime is not available on Flathub. These warnings are cosmetic and do not prevent other flatpaks from installing. To suppress, remove `adw-gtk3-dark` from your flatpak list in `custom/flatpaks/`.
 
-### Homebrew not installed after bootc switch (fixes #44)
+### Homebrew not available after bootc switch (fixes #44)
 
-Homebrew is installed at build time into the image. If you don't see `brew`, verify your Containerfile includes the Brew integration. Check `custom/brew/README.md` for setup instructions.
+Homebrew is **pre-staged at build time** (tarball + systemd services). The `brew-setup.service` extracts it on **first boot**. If you don't see `brew`, verify `brew-setup.service` ran (`systemctl status brew-setup.service`) and that your Containerfile includes the Brew integration.

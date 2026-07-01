@@ -32,9 +32,9 @@ OS_RELEASE="/usr/lib/os-release"
 
 # Derive image flavor from name
 if [[ "${IMAGE_NAME}" =~ nvidia ]]; then
-    IMAGE_FLAVOR="nvidia"
+	IMAGE_FLAVOR="nvidia"
 else
-    IMAGE_FLAVOR="main"
+	IMAGE_FLAVOR="main"
 fi
 
 # Image ref (used by bootc for upgrade source)
@@ -66,15 +66,15 @@ echo "  image-vendor: ${IMAGE_VENDOR}"
 ###############################################################################
 # Only modify if the file exists and VARIANT_ID is not already set
 if [[ -f "${OS_RELEASE}" ]] && ! grep -q "^VARIANT_ID=" "${OS_RELEASE}"; then
-    # Read existing values
-    if [[ -n "${VERSION:-}" ]]; then
-        OS_VERSION="${VERSION}"
-    else
-        OS_VERSION="${UBLUE_IMAGE_TAG}"
-    fi
+	# Read existing values
+	if [[ -n "${VERSION:-}" ]]; then
+		OS_VERSION="${VERSION}"
+	else
+		OS_VERSION="${UBLUE_IMAGE_TAG}"
+	fi
 
-    # Append our identity
-    cat >>"${OS_RELEASE}" <<EOF
+	# Append our identity
+	cat >>"${OS_RELEASE}" <<EOF
 
 # ${IMAGE_NAME} image identity
 VARIANT_ID="${IMAGE_FLAVOR}"
@@ -89,5 +89,5 @@ SUPPORT_URL="${SUPPORT_URL}"
 BUG_REPORT_URL="${BUG_REPORT_URL}"
 EOF
 
-    echo "Customized ${OS_RELEASE}"
+	echo "Customized ${OS_RELEASE}"
 fi
