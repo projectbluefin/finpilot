@@ -61,14 +61,14 @@ jobs:
 
       - name: Preflight
         id: preflight
-        uses: projectbluefin/actions/bootc-build/preflight@8fd476d7ad4023d3bcb56481407913fd6cf73f60 # v1
+        uses: projectbluefin/actions/bootc-build/preflight@d8f871c0ca7a868339d3c175200a7319492473c7 # v1
         with:
           registry: ghcr.io
           github-token: ${{ secrets.GITHUB_TOKEN }}
           image-name: ${{ env.IMAGE_NAME }}
 
       - name: Setup runner
-        uses: projectbluefin/actions/bootc-build/setup-runner@8fd476d7ad4023d3bcb56481407913fd6cf73f60 # v1
+        uses: projectbluefin/actions/bootc-build/setup-runner@d8f871c0ca7a868339d3c175200a7319492473c7 # v1
         with:
           storage-backend: btrfs
           update-podman: "true"
@@ -76,7 +76,7 @@ jobs:
 
       - name: Restore DNF cache
         id: dnf-cache-restore
-        uses: projectbluefin/actions/bootc-build/dnf-cache@8fd476d7ad4023d3bcb56481407913fd6cf73f60 # v1
+        uses: projectbluefin/actions/bootc-build/dnf-cache@d8f871c0ca7a868339d3c175200a7319492473c7 # v1
         with:
           action: restore
           cache-name: ${{ env.IMAGE_NAME }}
@@ -84,7 +84,7 @@ jobs:
 
       - name: Detect changes
         id: detect-changes
-        uses: projectbluefin/actions/bootc-build/detect-changes@8fd476d7ad4023d3bcb56481407913fd6cf73f60 # v1
+        uses: projectbluefin/actions/bootc-build/detect-changes@d8f871c0ca7a868339d3c175200a7319492473c7 # v1
         with:
           filters: |
             image:
@@ -126,7 +126,7 @@ jobs:
       - name: Generate tags
         if: steps.detect-changes.outputs.should_build == 'true' || github.event_name != 'pull_request'
         id: generate-tags
-        uses: projectbluefin/actions/bootc-build/generate-tags@8fd476d7ad4023d3bcb56481407913fd6cf73f60 # v1
+        uses: projectbluefin/actions/bootc-build/generate-tags@d8f871c0ca7a868339d3c175200a7319492473c7 # v1
         with:
           base-name: ${{ env.IMAGE_NAME }}
           stream-name: ${{ env.DEFAULT_TAG }}
@@ -136,7 +136,7 @@ jobs:
 
       - name: Save DNF cache
         if: always() && !cancelled() && github.event_name != 'pull_request'
-        uses: projectbluefin/actions/bootc-build/dnf-cache@8fd476d7ad4023d3bcb56481407913fd6cf73f60 # v1
+        uses: projectbluefin/actions/bootc-build/dnf-cache@d8f871c0ca7a868339d3c175200a7319492473c7 # v1
         with:
           action: save
           cache-name: ${{ env.IMAGE_NAME }}
@@ -182,7 +182,7 @@ jobs:
       - name: Push to GHCR
         if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
         id: push
-        uses: projectbluefin/actions/bootc-build/push-image@8fd476d7ad4023d3bcb56481407913fd6cf73f60 # v1
+        uses: projectbluefin/actions/bootc-build/push-image@d8f871c0ca7a868339d3c175200a7319492473c7 # v1
         with:
           image-name: ${{ env.IMAGE_NAME }}
           tags: ${{ steps.generate-tags.outputs.tags }}
