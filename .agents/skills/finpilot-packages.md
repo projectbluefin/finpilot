@@ -108,6 +108,8 @@ See `build/20-onepassword.sh.example` for a complete working example.
 
 Homebrew packages are installed by users after deployment. Best for CLI tools and development environments.
 
+**Note:** Homebrew itself is pre-staged at build time via `@ublue-os/brew` OCI container and extracted on first boot by `brew-setup.service`. Brewfiles define what users install *after* that extraction.
+
 **Files:**
 
 - `custom/brew/default.Brewfile` — General purpose CLI tools
