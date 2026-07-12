@@ -43,6 +43,33 @@ All example scripts in `build/` follow the pattern:
 
 ## Existing Example Scripts
 
+### `build/20-nvidia.sh.example`
+
+**What it does:**
+
+- Pulls pre-built NVIDIA akmods from `ghcr.io/ublue-os/akmods-nvidia-open`
+- Installs NVIDIA driver (open kernel modules, CUDA, libnvidia-container)
+- Configures CDI (Container Device Interface) GPU passthrough for Podman
+- Writes bootc kernel args: nouveau blacklist + `nvidia-drm.modeset=1`
+- Enables Mutter `kms-modifiers` for Wayland support on NVIDIA
+
+**How to activate:**
+
+```bash
+cp build/20-nvidia.sh.example build/20-nvidia.sh
+just build
+```
+
+All NVIDIA logic is self-contained in the script. When activated (renamed to `.sh`), it provisions NVIDIA support directly into the base image — no separate image variant needed. Deactivate by removing or renaming back to `.example`.
+
+**Expected validation:**
+
+- `pr-validation.yml` → shellcheck
+- `build-image.yml` → full build test
+- **Must test on actual NVIDIA hardware** — Wayland/modeset issues are not caught in CI
+
+---
+
 ### `build/20-onepassword.sh.example`
 
 **What it does:**
@@ -119,6 +146,7 @@ set -euo pipefail
 | Third-party repo (`20-*.sh`) | Yes        | Yes        | Verify repo URL accessible              |
 | Desktop swap (`30-*.sh`)     | Yes        | Yes        | Test in VM (`just run-vm-qcow2`)        |
 | COPR install (`20-*.sh`)     | Yes        | Yes        | Verify COPR exists and packages install |
+| NVIDIA GPU (`20-*.sh`)       | Yes        | Yes        | Test on NVIDIA hardware; verify `nvidia-smi` after boot |
 
 ## Link to Package Decision Tree
 

@@ -69,6 +69,19 @@ release, update both the `FEDORA_MAJOR_VERSION` ARG and the base image tag.
 - Always use `dnf5 install -y` (non-interactive)
 - COPR: enable → install → `copr_install_isolated` (auto-disables); never leave a repo enabled
 
+### NVIDIA GPU support
+
+NVIDIA support is a build-time option activated by copying the example script:
+
+```bash
+cp build/20-nvidia.sh.example build/20-nvidia.sh
+just build
+```
+
+All NVIDIA logic is self-contained in `20-nvidia.sh`. When activated, it provisions the NVIDIA driver, CDI container toolkit, Mutter kms-modifiers, and bootc kernel args directly into the base image — no separate image variant, no `IMAGE_NAME` gating.
+
+Deactivate by removing or renaming back to `.example`. See `build/20-nvidia.sh.example` for the full implementation.
+
 ### 00-image-info.sh branding
 
 The comment in the `os-release` append block must use `${IMAGE_NAME}`:
