@@ -71,16 +71,18 @@ release, update both the `FEDORA_MAJOR_VERSION` ARG and the base image tag.
 
 ### NVIDIA GPU support
 
-NVIDIA support is a build-time option activated by copying the example script:
+NVIDIA support is a build-time option activated by renaming the example script and adding its explicit Containerfile `RUN` block:
 
 ```bash
-cp build/20-nvidia.sh.example build/20-nvidia.sh
+mv build/40-nvidia.sh.example build/40-nvidia.sh
+# Add the standard RUN block for /ctx/build/40-nvidia.sh after 10-build.sh.
+# See build/README.md.
 just build
 ```
 
-All NVIDIA logic is self-contained in `20-nvidia.sh`. When activated, it provisions the NVIDIA driver, CDI container toolkit, Mutter kms-modifiers, and bootc kernel args directly into the base image — no separate image variant, no `IMAGE_NAME` gating.
+All NVIDIA logic is self-contained in `40-nvidia.sh`. When both the script and its explicit Containerfile `RUN` block are activated, it provisions the NVIDIA driver, CDI container toolkit, Mutter kms-modifiers, and bootc kernel args directly into the base image — no separate image variant, no `IMAGE_NAME` gating.
 
-Deactivate by removing or renaming back to `.example`. See `build/20-nvidia.sh.example` for the full implementation.
+Deactivate by removing its Containerfile `RUN` block and renaming the script back to `.example`. See `build/40-nvidia.sh.example` for the full implementation.
 
 ### 00-image-info.sh branding
 

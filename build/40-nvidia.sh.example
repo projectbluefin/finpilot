@@ -2,11 +2,14 @@
 set -euo pipefail
 
 # Description: NVIDIA GPU driver and container toolkit setup (example)
-# Activate by: cp build/20-nvidia.sh.example build/20-nvidia.sh
+# Activate by:
+#   1. mv build/40-nvidia.sh.example build/40-nvidia.sh
+#   2. Add an explicit RUN block for /ctx/build/40-nvidia.sh after 10-build.sh
+#      in Containerfile. See build/README.md for the standard block.
 #
 # This script provisions NVIDIA GPU support directly into the base image.
-# When activated (renamed to .sh), it runs on every build.
-# Deactivate by removing or renaming back to .example.
+# Deactivate by removing its Containerfile RUN block and renaming it back to
+# .example.
 
 echo "::group:: ===$(basename "$0")==="
 
@@ -33,8 +36,10 @@ skopeo copy --retry-times 3 \
     "docker://ghcr.io/ublue-os/akmods-nvidia-open:${AKMODS_FLAVOR}-$(rpm -E %fedora)-${KERNEL}" \
     dir:/tmp/akmods-rpms
 
-NVIDIA_TARGZ=$(jq -r '.layers[0].digest' /tmp/akmods-rpms/manifest.json | cut -d : -f 2)
-tar -xvzf "/tmp/akmods-rpms/${NVIDIA_TARGZ}" -C /tmp/
+mapfile -t NVIDIA_TARGZS < <(jq -r '.layers[].digest' /tmp/akmods-rpms/manifest.json | cut -d : -f 2)
+for nvidia_targz in "${NVIDIA_TARGZS[@]}"; do
+    tar -xvf "/tmp/akmods-rpms/${nvidia_targz}" -C /tmp/
+done
 mv /tmp/rpms/* /tmp/akmods-rpms/
 
 # -----------------------------------------------------------------------

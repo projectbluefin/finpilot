@@ -27,23 +27,24 @@ metadata:
 
 1. **Find the relevant example** in `build/` directory
 2. **Copy and rename** from `.example` to `.sh`
-3. **Customize** for your specific use case
-4. **Validate** with `shellcheck` and `just build`
-5. **Commit** (via PR to `main`)
+3. **Add its explicit `RUN` block** after `10-build.sh` in `Containerfile`
+4. **Customize** for your specific use case
+5. **Validate** with `shellcheck` and `just build`
+6. **Commit** (via PR to `main`)
 
 ## The Activation Pattern
 
 All example scripts in `build/` follow the pattern:
 
 1. **Inactive**: Named `NN-descriptive-name.sh.example`
-2. **Active**: Rename to `NN-descriptive-name.sh`
-3. **Execution**: Build scripts run in numerical order (`00-`, `10-`, `20-`, `30-`)
+2. **Activate the file**: Rename to `NN-descriptive-name.sh`
+3. **Activate execution**: Add an explicit `RUN` block after `10-build.sh` in `Containerfile`
 
-**Important:** Only `.sh` files are executed during the build. `.example` files are ignored.
+The template does not automatically discover numbered scripts. See `build/README.md` for the standard mounted `RUN` block; replace its script path with the activated example.
 
 ## Existing Example Scripts
 
-### `build/20-nvidia.sh.example`
+### `build/40-nvidia.sh.example`
 
 **What it does:**
 
@@ -56,11 +57,13 @@ All example scripts in `build/` follow the pattern:
 **How to activate:**
 
 ```bash
-cp build/20-nvidia.sh.example build/20-nvidia.sh
+mv build/40-nvidia.sh.example build/40-nvidia.sh
+# Add the standard RUN block for /ctx/build/40-nvidia.sh after 10-build.sh.
+# See build/README.md.
 just build
 ```
 
-All NVIDIA logic is self-contained in the script. When activated (renamed to `.sh`), it provisions NVIDIA support directly into the base image — no separate image variant needed. Deactivate by removing or renaming back to `.example`.
+All NVIDIA logic is self-contained in the script. It provisions NVIDIA support directly into the base image when both the script is renamed to `.sh` and its Containerfile `RUN` block is added. Deactivate by removing that `RUN` block and renaming the file back to `.example`.
 
 **Expected validation:**
 
@@ -82,7 +85,8 @@ All NVIDIA logic is self-contained in the script. When activated (renamed to `.s
 
 ```bash
 cp build/20-onepassword.sh.example build/20-onepassword.sh
-# Edit build/20-onepassword.sh to customize if needed
+# Add the standard RUN block for /ctx/build/20-onepassword.sh after 10-build.sh.
+# See build/README.md, then customize this script if needed.
 ```
 
 **Expected validation:**
@@ -104,7 +108,8 @@ cp build/20-onepassword.sh.example build/20-onepassword.sh
 
 ```bash
 cp build/30-cosmic-desktop.sh.example build/30-cosmic-desktop.sh
-# Edit build/30-cosmic-desktop.sh to customize if needed
+# Add the standard RUN block for /ctx/build/30-cosmic-desktop.sh after 10-build.sh.
+# See build/README.md, then customize this script if needed.
 ```
 
 **Expected validation:**
@@ -130,7 +135,8 @@ When adding a new pattern that others might reuse, create an `.example` file:
 set -euo pipefail
 
 # Description: [What this script does]
-# Activate by: cp build/NN-name.sh.example build/NN-name.sh
+# Activate by: rename this file to build/NN-name.sh, then add its explicit
+# RUN block after 10-build.sh in Containerfile (see build/README.md).
 # Customize: [What to change]
 
 # Example: Add a third-party repository
@@ -146,7 +152,7 @@ set -euo pipefail
 | Third-party repo (`20-*.sh`) | Yes        | Yes        | Verify repo URL accessible              |
 | Desktop swap (`30-*.sh`)     | Yes        | Yes        | Test in VM (`just run-vm-qcow2`)        |
 | COPR install (`20-*.sh`)     | Yes        | Yes        | Verify COPR exists and packages install |
-| NVIDIA GPU (`20-*.sh`)       | Yes        | Yes        | Test on NVIDIA hardware; verify `nvidia-smi` after boot |
+| NVIDIA GPU (`40-nvidia.sh`)  | Yes        | Yes        | Test on NVIDIA hardware; verify `nvidia-smi` after boot |
 
 ## Link to Package Decision Tree
 
@@ -163,12 +169,13 @@ For deciding whether to use an example script or add directly to `build/10-build
 | Rationalization                                              | Reality                                                                                                  |
 | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
 | "I'll just add my script directly — no need for an example." | If the pattern is reusable, an example helps future contributors. If it's one-off, add to `10-build.sh`. |
-| "I'll leave it as `.example` and never rename it."           | `.example` files are ignored in the build. They must be renamed to `.sh` to have any effect.             |
-| "I modified the `.example` file — that should be enough."    | The build only runs `.sh` files. Modify the `.example`, then rename to `.sh`.                            |
+| "I'll leave it as `.example` and never rename it."           | `.example` files are inactive. Rename one to `.sh` and add its explicit Containerfile `RUN` block.       |
+| "I renamed the example, so it will run."                      | The template runs only scripts explicitly named in Containerfile. Add the matching `RUN` block.           |
 
 ## Red Flags
 
 - `.example` file modified but not renamed to `.sh`
+- Renamed `.sh` file without a matching Containerfile `RUN` block
 - New `.sh` file without `set -euo pipefail`
 - Script using `dnf` or `yum` instead of `dnf5`
 - COPR repo not disabled after install
@@ -178,6 +185,7 @@ For deciding whether to use an example script or add directly to `build/10-build
 ## Verification
 
 - [ ] Did you rename the `.example` file to `.sh`?
+- [ ] Did you add its `RUN` block after `10-build.sh` in Containerfile?
 - [ ] Did you run `shellcheck` on the new `.sh` file?
 - [ ] Did the build succeed with `just build`?
 - [ ] For desktop swaps: did you test in a VM (`just run-vm-qcow2`)?
