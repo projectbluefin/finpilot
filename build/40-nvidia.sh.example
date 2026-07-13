@@ -19,7 +19,7 @@ echo "::group:: ===$(basename "$0")==="
 # For stock Fedora kernels (silverblue), use flavor "main".
 # For custom kernels (bluefin-style), override AKMODS_FLAVOR via ARG.
 AKMODS_FLAVOR="${AKMODS_FLAVOR:-main}"
-KERNEL="${KERNEL:-$(rpm -q kernel-core --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}' 2>/dev/null)}"
+KERNEL="${KERNEL:-$(rpm -q kernel-core --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}' 2>/dev/null || true)}"
 
 if [[ -z "${KERNEL}" ]]; then
     echo "ERROR: Could not determine kernel version"
