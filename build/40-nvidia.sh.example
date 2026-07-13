@@ -32,6 +32,7 @@ echo "Using kernel: ${KERNEL} (flavor: ${AKMODS_FLAVOR})"
 # 2. Pull pre-built NVIDIA akmods from ublue-os OCI artifact
 # -----------------------------------------------------------------------
 mkdir -p /tmp/akmods-rpms
+dnf5 install -y skopeo jq
 skopeo copy --retry-times 3 \
     "docker://ghcr.io/ublue-os/akmods-nvidia-open:${AKMODS_FLAVOR}-$(rpm -E %fedora)-${KERNEL}" \
     dir:/tmp/akmods-rpms
