@@ -26,6 +26,13 @@ shopt -u nullglob
 
 echo "::endgroup::"
 
+echo "::group:: Overlay Brew Integration Files"
+
+# Brew integration files from @ublue-os/brew OCI (tarball, systemd services, shell integration)
+rsync -rvK /ctx/oci/brew/ /
+
+echo "::endgroup::"
+
 echo "::group:: Copy Custom Files"
 
 # Copy Brewfiles to standard location
@@ -56,6 +63,9 @@ echo "::group:: System Configuration"
 
 # Enable/disable systemd services
 systemctl enable podman.socket
+systemctl enable brew-setup.service
+systemctl enable brew-update.timer
+systemctl enable brew-upgrade.timer
 # Example: systemctl mask unwanted-service
 
 echo "::endgroup::"
