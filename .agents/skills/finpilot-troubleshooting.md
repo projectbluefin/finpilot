@@ -46,6 +46,18 @@ metadata:
 | Multi-stage build fails at `ctx` stage | Missing `COPY --from=` or invalid OCI image reference                        | Verify OCI image names and digests in `Containerfile` ctx stage                             |
 | `just build` fails immediately         | `just` not installed or `Justfile` syntax error                              | Run `just --list`, check `Justfile` for syntax errors                                       |
 
+## NVIDIA-Specific Issues
+
+| Symptom                                    | Cause                                              | Solution                                                                                               |
+| ------------------------------------------ | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `nvidia-smi` not found after boot          | NVIDIA driver was not installed during build       | Rename `40-nvidia.sh.example` to `.sh`, add its RUN block after `10-build.sh`, and rebuild |
+| NVIDIA build fails: "Signing key not found" | ublue-os/staging COPR GPG key not imported         | Add `rpm --import https://download.copr.fedorainfracloud.org/results/ublue-os/staging/pubkey.gpg` before `nvidia-install.sh` |
+| NVIDIA build fails: akmods pull fails      | Wrong `AKMODS_FLAVOR` or kernel version mismatch   | Verify `AKMODS_FLAVOR` matches your base image (`main` for stock Fedora, `coreos-stable` for bluefin kernel); check kernel version with `rpm -q kernel-core` |
+| Wayland broken on NVIDIA                   | Missing `nvidia-drm.modeset=1` or `kms-modifiers`  | Confirm `/usr/lib/bootc/kargs.d/00-nvidia.toml` exists with modeset karg; verify `kms-modifiers` was added to Mutter gschema override |
+| Podman GPU passthrough not working         | CDI not configured or `nvidia-container-toolkit` missing | Verify `nvidia-container-toolkit-base` is installed; check `nvidia-ctk config --set nvidia-container-cli.no-cgroups --in-place` ran |
+| `nouveau_icd` conflicts with NVIDIA driver | Nouveau Vulkan ICD not removed                     | Add `rm -f /usr/share/vulkan/icd.d/nouveau_icd.*.json` in the NVIDIA script                           |
+| Container fails with "device not found"    | NVIDIA kernel module not loaded                    | Reboot after switching to NVIDIA image; verify `lsmod \| grep nvidia`; check kernel arg blacklist isn't too aggressive |
+
 ## CI Failures
 
 | Symptom                                    | Cause                                              | Solution                                                                  |

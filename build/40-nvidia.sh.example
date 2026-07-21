@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Description: NVIDIA GPU driver and container toolkit setup (example)
+# Activate by:
+#   1. mv build/40-nvidia.sh.example build/40-nvidia.sh
+#   2. Add an explicit RUN block for /ctx/build/40-nvidia.sh after 10-build.sh
+#      in Containerfile. See build/README.md for the standard block.
+#
+# This script provisions NVIDIA GPU support directly into the base image.
+# Deactivate by removing its Containerfile RUN block and renaming it back to
+# .example.
+
+echo "::group:: ===$(basename "$0")==="
+
+# -----------------------------------------------------------------------
+# 1. Determine kernel version and akmods flavor
+# -----------------------------------------------------------------------
+# For stock Fedora kernels (silverblue), use flavor "main".
+# For custom kernels (bluefin-style), override AKMODS_FLAVOR via ARG.
+AKMODS_FLAVOR="${AKMODS_FLAVOR:-main}"
+KERNEL="${KERNEL:-$(rpm -q kernel-core --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}' 2>/dev/null || true)}"
+
+if [[ -z "${KERNEL}" ]]; then
+    echo "ERROR: Could not determine kernel version"
+    exit 1
+fi
+
+echo "Using kernel: ${KERNEL} (flavor: ${AKMODS_FLAVOR})"
+
+# -----------------------------------------------------------------------
+# 2. Pull pre-built NVIDIA akmods from ublue-os OCI artifact
+# -----------------------------------------------------------------------
+mkdir -p /tmp/akmods-rpms
+dnf5 install -y skopeo jq
+skopeo copy --retry-times 3 \
+    "docker://ghcr.io/ublue-os/akmods-nvidia-open:${AKMODS_FLAVOR}-$(rpm -E %fedora)-${KERNEL}" \
+    dir:/tmp/akmods-rpms
+
+mapfile -t NVIDIA_TARGZS < <(jq -r '.layers[].digest' /tmp/akmods-rpms/manifest.json | cut -d : -f 2)
+for nvidia_targz in "${NVIDIA_TARGZS[@]}"; do
+    tar -xvf "/tmp/akmods-rpms/${nvidia_targz}" -C /tmp/
+done
+mv /tmp/rpms/* /tmp/akmods-rpms/
+
+# -----------------------------------------------------------------------
+# 3. Exclude Go NVIDIA Container Toolkit from Fedora repo (avoid conflicts)
+# -----------------------------------------------------------------------
+dnf5 config-manager setopt excludepkgs=golang-github-nvidia-container-toolkit
+
+# -----------------------------------------------------------------------
+# 4. Pre-import COPR GPG key and run nvidia-install.sh from the artifact
+# -----------------------------------------------------------------------
+rpm --import "https://download.copr.fedorainfracloud.org/results/ublue-os/staging/pubkey.gpg"
+IMAGE_NAME="${BASE_IMAGE_NAME}" \
+    AKMODNV_PATH="/tmp/akmods-rpms" \
+    MULTILIB=0 \
+    /tmp/akmods-rpms/ublue-os/nvidia-install.sh
+
+# -----------------------------------------------------------------------
+# 5. Remove nouveau Vulkan ICD (prevents conflicts with nvidia driver)
+# -----------------------------------------------------------------------
+rm -f /usr/share/vulkan/icd.d/nouveau_icd.*.json
+
+# -----------------------------------------------------------------------
+# 6. Symlink nvidia-ml (needed by some container runtimes)
+# -----------------------------------------------------------------------
+ln -sf libnvidia-ml.so.1 /usr/lib64/libnvidia-ml.so
+
+# -----------------------------------------------------------------------
+# 7. Write bootc kernel args: blacklist nouveau, enable nvidia-drm modeset
+# -----------------------------------------------------------------------
+tee /usr/lib/bootc/kargs.d/00-nvidia.toml <<EOF
+kargs = ["rd.driver.blacklist=nouveau", "modprobe.blacklist=nouveau", "nvidia-drm.modeset=1", "initcall_blacklist=simpledrm_platform_driver_init"]
+EOF
+
+# -----------------------------------------------------------------------
+# 8. Enable Mutter kms-modifiers for NVIDIA Wayland support
+# -----------------------------------------------------------------------
+# Required for correct Wayland rendering on NVIDIA hardware.
+if [[ -f /usr/share/glib-2.0/schemas/zz0-bluefin-modifications.gschema.override ]]; then
+    sed -i "/experimental-features/ s/\]/, 'kms-modifiers'&/" \
+        /usr/share/glib-2.0/schemas/zz0-bluefin-modifications.gschema.override
+fi
+
+# -----------------------------------------------------------------------
+# 9. Install NVIDIA Container Toolkit (CDI-based, for Podman passthrough)
+# -----------------------------------------------------------------------
+# Uses the official C toolkit (nvidia-container-toolkit-base), NOT the
+# Fedora Go-based toolkit. CDI (Container Device Interface) is the correct
+# approach for bootc/rootless containers — no legacy OCI hooks.
+curl -fsSL https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo \
+    | tee /etc/yum.repos.d/nvidia-container-toolkit.repo
+dnf5 -y install nvidia-container-toolkit-base
+nvidia-ctk config --set nvidia-container-cli.no-cgroups --in-place
+rm -f /etc/yum.repos.d/nvidia-container-toolkit.repo
+
+# -----------------------------------------------------------------------
+# 10. Verify critical NVIDIA packages are installed
+# -----------------------------------------------------------------------
+NV_PACKAGES=(
+    libnvidia-container-tools
+    kmod-nvidia
+    nvidia-driver-cuda
+)
+for pkg in "${NV_PACKAGES[@]}"; do
+    rpm -q "${pkg}" >/dev/null || {
+        echo "ERROR: Missing NVIDIA package: ${pkg}"
+        exit 1
+    }
+done
+
+echo "NVIDIA setup complete"
+echo "::endgroup::"

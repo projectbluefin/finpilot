@@ -45,6 +45,7 @@ metadata:
 | Replace desktop environment    | Remove old → install new → set default        | `build/30-*.sh` (see examples)       |
 | Switch base image              | Update `FROM` line                            | `Containerfile`                      |
 | Add OCI containers             | Uncomment/add `COPY --from=`                  | `Containerfile` ctx stage            |
+| Add NVIDIA GPU support         | Rename `40-nvidia.sh.example`, then add its RUN block after `10-build.sh` | `build/40-nvidia.sh` |
 
 ## Build-Time: `build/10-build.sh`
 
