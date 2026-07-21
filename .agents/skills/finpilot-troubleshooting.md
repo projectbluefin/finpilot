@@ -57,6 +57,7 @@ metadata:
 | Podman GPU passthrough not working         | CDI not configured or `nvidia-container-toolkit` missing | Verify `nvidia-container-toolkit-base` is installed; check `nvidia-ctk config --set nvidia-container-cli.no-cgroups --in-place` ran |
 | `nouveau_icd` conflicts with NVIDIA driver | Nouveau Vulkan ICD not removed                     | Add `rm -f /usr/share/vulkan/icd.d/nouveau_icd.*.json` in the NVIDIA script                           |
 | Container fails with "device not found"    | NVIDIA kernel module not loaded                    | Reboot after switching to NVIDIA image; verify `lsmod \| grep nvidia`; check kernel arg blacklist isn't too aggressive |
+
 ## CI Failures
 
 | Symptom                                    | Cause                                              | Solution                                                                  |
