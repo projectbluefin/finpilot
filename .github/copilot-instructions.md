@@ -4,16 +4,17 @@ Use @projectbluefin/finpilot as a template, name the OS the repository name. Ens
 
 1. Rename `finpilot` to the repository name in exactly 7 files (see README section "2. Rename the Project")
 2. Enable GitHub Actions and set `RENOVATE_TOKEN` (Classic PAT with `repo` + `workflow`)
-3. Configure branch protection on `main` with `validate` as required status check
-4. Enable auto-merge in repository settings
-5. Trigger first green build (push to `main` or run workflow manually)
+3. Create `stable` from `main`, replace `OWNER` in `.github/pull.yml`, and install the pull GitHub App
+4. Protect `main` and `stable`, with `validate` required on `main`
+5. Enable auto-merge in repository settings
+6. Trigger the first `:stable-testing` build on `main`, then approve promotion to `stable`
 
 **Phase 2 — Customize:**
 
 1. Read `.agents/skills/finpilot-packages.md` and add your first system package + first Flatpak/Brew entry
 2. Update the README "What Makes this Raptor Different" section
 3. Test locally with `just build && just build-qcow2 && just run-vm-qcow2`
-4. Open a PR and merge once `validate` passes
+4. Open a PR to `main`, merge once `validate` passes, test `:stable-testing`, and approve promotion
 
 **Phase 3 — Production:**
 

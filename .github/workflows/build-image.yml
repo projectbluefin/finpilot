@@ -1,22 +1,22 @@
 ---
 name: Build and Push Image
 
-# PR builds are disabled by default to save CI minutes. To enable them, add:
-#   pull_request:
-#     branches:
-#       - main
-#     paths-ignore:
-#       - "**.md"
-#       - ".github/workflows/*validate*.yml"
 on:
-  push:
+  pull_request:
     branches:
       - main
+      - stable
     paths-ignore:
       - "**.md"
       - ".github/workflows/*validate*.yml"
-  schedule:
-    - cron: "05 10 * * *" # 10:05am UTC everyday
+  push:
+    branches:
+      - main
+      - stable
+    paths-ignore:
+      - "**.md"
+      - ".github/workflows/*validate*.yml"
+  merge_group:
   workflow_dispatch:
 
 permissions:
@@ -33,6 +33,8 @@ env:
   IMAGE_KEYWORDS: "bootc,ublue,universal-blue"
   IMAGE_LOGO_URL: "https://avatars.githubusercontent.com/u/120078124?s=200&v=4"
   DEFAULT_TAG: "stable"
+  PRODUCTION_BRANCH: "stable"
+  TESTING_BRANCH: "main"
   REGISTRY_CACHE_WRITE: ${{ github.event_name != 'pull_request' && '1' || '0' }}
 
 concurrency:
@@ -53,8 +55,23 @@ jobs:
     steps:
       - name: Prepare environment
         run: |
-          echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}" >> ${GITHUB_ENV}
-          echo "IMAGE_NAME=${IMAGE_NAME,,}" >> ${GITHUB_ENV}
+          echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}" >> "${GITHUB_ENV}"
+          echo "IMAGE_NAME=${IMAGE_NAME,,}" >> "${GITHUB_ENV}"
+
+      - name: Determine image tag
+        id: determine-tag
+        shell: bash
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [[ "${REF_NAME}" != "${PRODUCTION_BRANCH}" ]]; then
+            echo "DEFAULT_TAG=${DEFAULT_TAG}-testing" >> "${GITHUB_ENV}"
+            echo "TAG_STREAM=testing" >> "${GITHUB_ENV}"
+            echo "Building testing image: ${DEFAULT_TAG}-testing"
+          else
+            echo "TAG_STREAM=${DEFAULT_TAG}" >> "${GITHUB_ENV}"
+            echo "Building production image: ${DEFAULT_TAG}"
+          fi
 
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -120,7 +137,7 @@ jobs:
         run: |
           VERSION_LABEL=$(sudo podman inspect "localhost/${IMAGE_NAME}:${DEFAULT_TAG}" \
             --format '{{index .Config.Labels "org.opencontainers.image.version"}}')
-          echo "version=${VERSION_LABEL}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION_LABEL}" >> "${GITHUB_OUTPUT}"
           echo "Version: ${VERSION_LABEL}"
 
       - name: Generate tags
@@ -129,10 +146,44 @@ jobs:
         uses: projectbluefin/actions/bootc-build/generate-tags@c3ffb5dd594f4a363298bacc7ad4cfe18457fa97 # v1
         with:
           base-name: ${{ env.IMAGE_NAME }}
-          stream-name: ${{ env.DEFAULT_TAG }}
+          stream-name: ${{ env.TAG_STREAM }}
           version-label: ${{ steps.version.outputs.version }}
           event-name: ${{ github.event_name }}
           pr-number: ${{ github.event.number }}
+
+      - name: Finalize branch tags
+        if: steps.detect-changes.outputs.should_build == 'true' || github.event_name != 'pull_request'
+        id: branch-tags
+        shell: bash
+        env:
+          GENERATED_TAGS: ${{ steps.generate-tags.outputs.tags }}
+        run: |
+          read -r -a generated_tags <<< "${GENERATED_TAGS}"
+          branch_tags=()
+
+          add_tag() {
+            local candidate="$1"
+            local existing
+            for existing in "${branch_tags[@]}"; do
+              [[ "${existing}" == "${candidate}" ]] && return
+            done
+            branch_tags+=("${candidate}")
+          }
+
+          for tag in "${generated_tags[@]}"; do
+            if [[ "${TAG_STREAM}" == "testing" ]]; then
+              if [[ "${tag}" == testing* ]]; then
+                tag="stable-${tag}"
+              else
+                tag="${tag/-testing-/-stable-testing-}"
+              fi
+            fi
+            add_tag "${tag}"
+          done
+          add_tag "${DEFAULT_TAG}"
+
+          echo "tags=${branch_tags[*]}" >> "${GITHUB_OUTPUT}"
+          echo "default-tag=${DEFAULT_TAG}" >> "${GITHUB_OUTPUT}"
 
       - name: Save DNF cache
         if: always() && !cancelled() && github.event_name != 'pull_request'
@@ -165,14 +216,14 @@ jobs:
         if: github.event_name != 'pull_request'
         shell: bash
         env:
-          ALIAS_TAGS: ${{ steps.generate-tags.outputs.tags }}
+          ALIAS_TAGS: ${{ steps.branch-tags.outputs.tags }}
         run: |
           sudo -E "$(command -v just)" tag-images "${IMAGE_NAME}" \
                           "${DEFAULT_TAG}" \
                           "${ALIAS_TAGS}"
 
       - name: Login to GitHub Container Registry
-        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ghcr.io
@@ -180,13 +231,13 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Push to GHCR
-        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        if: github.event_name != 'pull_request'
         id: push
         uses: projectbluefin/actions/bootc-build/push-image@c3ffb5dd594f4a363298bacc7ad4cfe18457fa97 # v1
         with:
           image-name: ${{ env.IMAGE_NAME }}
-          tags: ${{ steps.generate-tags.outputs.tags }}
-          default-tag: ${{ steps.generate-tags.outputs.default-tag }}
+          tags: ${{ steps.branch-tags.outputs.tags }}
+          default-tag: ${{ steps.branch-tags.outputs.default-tag }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       # OPTIONAL: Sign and attest (SLSA Build L2 provenance)

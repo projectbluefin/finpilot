@@ -30,6 +30,39 @@ Read the repo skill docs before changing behavior:
 | Initialize/ rename this template               | `finpilot-templates.md`                   |
 | Orient to repo architecture                    | `finpilot-overview.md`                    |
 
+## Branch Strategy
+
+- `main` is the testing branch and publishes `:stable-testing`.
+- `stable` is the production branch and publishes `:stable`.
+- All feature and Renovate pull requests target `main`.
+- pull[bot] opens promotion pull requests from `main` to `stable` using `.github/pull.yml`.
+- Never make independent changes on `stable`; approve promotion only after testing the candidate image.
+
+## CI Structure
+
+```text
+.github/
+├── pull.yml                  # pull[bot] main -> stable promotion
+└── workflows/
+    ├── build-image.yml       # PR builds and branch-aware image publishing
+    ├── pr-validation.yml     # Required validation for PRs to main
+    ├── renovate.yml          # Dependency update automation
+    └── validate-*.yml        # Targeted file validation
+```
+
+## Release Workflow
+
+1. Open changes against `main`.
+2. Merge only after required validation and image build checks pass.
+3. Test `ghcr.io/OWNER/IMAGE:stable-testing`.
+4. Review the pull[bot] promotion PR from `main` to `stable`.
+5. Merge the promotion to publish `ghcr.io/OWNER/IMAGE:stable`.
+
+| Branch | Mutable image tag | Audience |
+| --- | --- | --- |
+| `main` | `:stable-testing` | Testers and release candidates |
+| `stable` | `:stable` | Production systems |
+
 ## CRITICAL: GitHub API Usage
 
 **ALWAYS use GitHub API for external references:**
@@ -80,11 +113,13 @@ Read the repo skill docs before changing behavior:
 5. **ALWAYS** use `-y` flag for non-interactive installs
 6. **NEVER** use `dnf5` in ujust files — only Brewfile/Flatpak shortcuts
 7. **NEVER** push directly to `main` (only via PR with passing `validate` check)
-8. **ALWAYS** confirm with user before deviating from @ublue-os/bluefin patterns
-9. **ALWAYS** run shellcheck/YAML validation before committing
-10. **ALWAYS** follow numbered script convention: `10-*.sh`, `20-*.sh`, `30-*.sh`
-11. **ALWAYS** validate that new Flatpak IDs exist on Flathub before adding
-12. **NEVER** modify validation workflows without understanding impact on PR checks
+8. **NEVER** push directly to `stable`; promote tested `main` commits through pull[bot]
+9. **ALWAYS** target `main` and test `:stable-testing` before approving promotion
+10. **ALWAYS** confirm with user before deviating from @ublue-os/bluefin patterns
+11. **ALWAYS** run shellcheck/YAML validation before committing
+12. **ALWAYS** follow numbered script convention: `10-*.sh`, `20-*.sh`, `30-*.sh`
+13. **ALWAYS** validate that new Flatpak IDs exist on Flathub before adding
+14. **NEVER** modify validation workflows without understanding impact on PR checks
 
 ## Analysis vs Implementation
 
@@ -100,6 +135,6 @@ Assisted-by: [Model Name] via [Tool Name]
 
 ---
 
-**Last Updated**: 2026-06-16
+**Last Updated**: 2026-08-04
 **Template Version**: finpilot (Agent UX Overhaul)
 **Maintainer**: Universal Blue Community

@@ -33,16 +33,24 @@ metadata:
 
 ## Workflow Map
 
-| File                     | Trigger                           | Purpose                                              |
-| ------------------------ | --------------------------------- | ---------------------------------------------------- |
-| `build-image.yml`        | push main, schedule, manual       | Build + push `:stable` via `projectbluefin/actions`  |
-| `pr-validation.yml`      | PR → main                         | shellcheck + hadolint + pre-commit via `validate-pr` |
-| `renovate.yml`           | schedule 6h, push renovate config | Self-hosted Renovate runner                          |
-| `clean.yml`              | schedule weekly                   | Delete GHCR images older than 90 days                |
-| `validate-brewfiles.yml` | PR paths: `custom/brew/**`        | Homebrew Brewfile syntax check                       |
-| `validate-flatpaks.yml`  | PR paths: `custom/flatpaks/**`    | Flathub app ID existence check                       |
-| `validate-justfiles.yml` | PR paths: `Justfile`              | `just --list` syntax check                           |
-| `validate-renovate.yml`  | PR paths: `renovate.json`         | `renovate-config-validator`                          |
+| File                     | Trigger                                  | Purpose                                              |
+| ------------------------ | ---------------------------------------- | ---------------------------------------------------- |
+| `build-image.yml`        | PR/push main + stable, merge group, manual | Build PRs; publish `:stable-testing` or `:stable`   |
+| `pr-validation.yml`      | PR -> main                               | shellcheck + hadolint + pre-commit via `validate-pr` |
+| `renovate.yml`           | schedule 6h, push renovate config        | Self-hosted Renovate runner                          |
+| `clean.yml`              | schedule weekly                          | Delete GHCR images older than 90 days                |
+| `validate-brewfiles.yml` | PR paths: `custom/brew/**`               | Homebrew Brewfile syntax check                       |
+| `validate-flatpaks.yml`  | PR paths: `custom/flatpaks/**`           | Flathub app ID existence check                       |
+| `validate-justfiles.yml` | PR paths: `Justfile`                     | `just --list` syntax check                           |
+| `validate-renovate.yml`  | PR paths: `renovate.json`                | `renovate-config-validator`                          |
+
+## Branch Promotion and Tags
+
+- `main` is the testing branch and publishes `:stable-testing`.
+- `stable` is the production branch and publishes `:stable`.
+- `.github/pull.yml` configures pull[bot] to promote `main` to `stable`.
+- The shared `generate-tags` action uses a `testing` stream internally; the workflow normalizes those aliases to `stable-testing` before publishing.
+- Never add branch-specific changes directly to `stable`; its history is hard-reset from `main` during promotion.
 
 ## Composite Action Pins
 

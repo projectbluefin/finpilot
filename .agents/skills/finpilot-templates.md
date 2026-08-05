@@ -29,9 +29,11 @@ metadata:
 3. **Enable GitHub Actions** in the Actions tab
 4. **Add `RENOVATE_TOKEN` secret** (Classic PAT, `repo` + `workflow` scopes)
 5. **Enable auto-merge** (Settings → General → Pull Requests → Allow auto-merge)
-6. **Configure branch protection for `main`** with `validate` as required check
-7. **Trigger first build** — push any commit or run the workflow manually
-8. **Enable signing** (optional) — uncomment `sign-and-publish` step in `build-image.yml`
+6. **Create `stable` from `main` and protect it from direct pushes**
+7. **Replace `OWNER` in `.github/pull.yml` and install the pull GitHub App**
+8. **Protect `main`** with `validate` as a required check
+9. **Trigger the first `:stable-testing` build and approve promotion**
+10. **Enable signing** (optional) — uncomment `sign-and-publish` step in `build-image.yml`
 
 ## The Seven Rename Locations
 
@@ -112,6 +114,7 @@ Static-key signing (`SIGNING_SECRET`) is not supported by this template.
 - AGENTS.md referencing line numbers instead of semantic identifiers
 - `## Start here` section removed or not pointing to skill files
 - `RENOVATE_TOKEN` not set but Renovate workflow is enabled (fails silently on first run)
+- `.github/pull.yml` still contains `OWNER` or `stable` accepts direct pushes
 
 ## Verification
 
@@ -120,5 +123,7 @@ Static-key signing (`SIGNING_SECRET`) is not supported by this template.
 - [ ] `RENOVATE_TOKEN` secret added?
 - [ ] Auto-merge enabled in repository settings?
 - [ ] Branch protection for `main` configured with `validate` as required check?
-- [ ] First build triggered and succeeded?
+- [ ] `stable` created and protected from direct pushes?
+- [ ] pull GitHub App installed and `OWNER` replaced?
+- [ ] `:stable-testing` tested before promotion to `:stable`?
 - [ ] `AGENTS.md` `Last Updated` date current?
