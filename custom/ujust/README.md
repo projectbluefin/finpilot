@@ -93,7 +93,7 @@ install-something:
 ```
 
 ### User Prompts
-Use `gum` for interactive prompts (included in Universal Blue images):
+Use `gum` for interactive prompts. The template installs it at build time because the default ujust recipes depend on it:
 ```just
 interactive-command:
     #!/usr/bin/bash
