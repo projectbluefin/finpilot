@@ -264,41 +264,35 @@ Ready to take your custom OS to production? Enable these features for enhanced s
 
 - [ ] **Enable Image Rechunking** (Recommended)
   - Optimizes bootc image layers for better update performance
-  - Reduces update sizes by 5-10x when combined with package cadence data
   - Improves download resumability with evenly sized layers
-  - To enable:
-    1. Edit `.github/workflows/build-image.yml`
-    2. Find the "OPTIONAL: Rechunking" section
-    3. Uncomment the `bootc-build/chunka` step
-  - For optimal results, also add `bootc-build/apply-pkg-intervals` and a `pkg-cadence.yml` workflow
+  - Set `ENABLE_RECHUNKING: "true"` in `.github/workflows/build-image.yml`
+  - Uses OCI-native chunkah; `/usr/libexec/bootc-base-imagectl` is not required
   - Status: **Not enabled by default** (optional optimization)
 
 #### Adding Image Rechunking
 
-After building your bootc image, add a rechunk step before pushing to the registry. The template ships with a commented `bootc-build/chunka` step in `.github/workflows/build-image.yml`:
+The old rechunking recipe used `/usr/libexec/bootc-base-imagectl`, which is absent from many Universal Blue images. Do not copy that recipe or install a legacy rechunker: its layer format is not a safe migration path to the current implementation.
+
+Finpilot instead uses the OCI-native [`bootc-build/chunka`](https://github.com/projectbluefin/actions/tree/main/bootc-build/chunka) action. The action runs chunkah from a pinned container and replaces the locally built image before the existing tag and push steps. The default Fedora Silverblue-based finpilot image is RPM-based, so chunkah can discover components from its RPM database without `bootc-base-imagectl`.
+
+To enable it, change the workflow environment value:
 
 ```yaml
-- name: Rechunk image
-  if: github.event_name != 'pull_request'
-  id: rechunk-image
-  uses: projectbluefin/actions/bootc-build/chunka@6231015b336556d2ff0adc1d1e59514bf19dcb42 # v1
-  with:
-    source-image: localhost/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}
-    max-layers: 128
+env:
+  ENABLE_RECHUNKING: "true"
+  RECHUNK_MAX_LAYERS: "128"
 ```
 
-This uses [chunkah](https://github.com/coreos/chunkah) to reorganize OCI layers without rpm-ostree. Renovate will keep the action updated once it is uncommented.
+Rechunking runs only for publish builds, not pull requests. It requires additional runner time and temporary storage. Keep `ENABLE_RECHUNKING` set to `"false"` if those costs are more important than smaller OTA deltas.
 
-**Parameters:**
+**Custom base images:** This switch is supported for the template's default RPM-based image. BuildStream-produced images strip the component xattrs chunkah needs and require an `xattr-manifest`; changing to one of those images is not a one-line setup. See the action's `xattr-manifest` input before replacing the default base.
 
-- `max-layers`: Maximum number of layers for the rechunked image (128 is a typical bootc default)
-- `source-image`: Local image reference to rechunk
-
-**For optimal OTA deltas**, also add `bootc-build/apply-pkg-intervals` before the rechunk step and create a `.github/workflows/pkg-cadence.yml` workflow that calls `projectbluefin/actions/.github/workflows/reusable-pkg-cadence.yml@v1`. This groups packages by update cadence (weekly, monthly, quarterly, yearly) so a typical update only downloads layers that actually changed. Without it, chunkah still works but uses default layer grouping.
+**Optional package cadence:** Basic rechunking does not require package cadence data. Advanced deployments can run [`bootc-build/apply-pkg-intervals`](https://github.com/projectbluefin/actions/tree/main/bootc-build/apply-pkg-intervals) before rechunking and maintain `files/pkg-intervals.tsv` with the reusable package-cadence workflow. That workflow requires a repository GitHub App ID and private key, so configure it separately rather than treating it as part of basic enablement.
 
 **References:**
 
-- [CoreOS rpm-ostree build-chunked-oci documentation](https://coreos.github.io/rpm-ostree/build-chunked-oci/)
+- [chunkah](https://github.com/coreos/chunkah)
+- [projectbluefin/actions rechunking](https://github.com/projectbluefin/actions/tree/main/bootc-build/chunka)
 - [bootc documentation](https://containers.github.io/bootc/)
 
 ### After Enabling Production Features

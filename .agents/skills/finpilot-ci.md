@@ -56,6 +56,25 @@ uses: projectbluefin/actions/bootc-build/setup-runner@<sha> # v1
 
 The SHA comment (`# v1`) is for human readability only — Renovate ignores it.
 
+## Rechunking
+
+Set `ENABLE_RECHUNKING: "true"` in `build-image.yml` to enable the existing
+`bootc-build/chunka` step. Keep the action active behind the feature flag rather
+than commenting it out so Renovate continues to update its SHA.
+
+The action is OCI-native and does not use `/usr/libexec/bootc-base-imagectl`.
+Finpilot's default Fedora Silverblue image follows the RPM path, where chunkah
+discovers components from the RPM database.
+
+Rechunking is not a drop-in switch after replacing the default base with a
+BuildStream-produced image. Those images require a generated `xattr-manifest`
+because BuildStream strips component xattrs during OCI export.
+
+Package cadence optimization is optional. `bootc-build/apply-pkg-intervals`
+requires a maintained `files/pkg-intervals.tsv`; the reusable cadence workflow
+also requires GitHub App credentials. Do not present either as a prerequisite
+for basic rechunking.
+
 ## Adding a New Tool (e.g., jq, cosign)
 
 Always pin to a specific version with a Renovate tracking comment:
