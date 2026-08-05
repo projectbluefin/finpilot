@@ -9,8 +9,9 @@ This directory contains Just recipe files that will be installed into your custo
 ## How It Works
 
 1. **During Build**: All `.just` files in this directory are consolidated and copied to `/usr/share/ublue-os/just/60-custom.just` in the image
-2. **After Installation**: Users run `ujust` to see available commands
-3. **User Experience**: Simple command interface for system tasks
+2. **Automatic Import**: The base `ublue-os-just` package imports `60-custom.just`; Bluefin recipes from `projectbluefin/common` remain available in the build context but are not installed by default
+3. **After Installation**: Users run `ujust` to see available commands
+4. **User Experience**: Simple command interface for system tasks
 
 ## File Structure
 
