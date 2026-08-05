@@ -62,8 +62,9 @@ finpilot is a **bootc image template** following the Bluefin multi-stage build a
 │   └── clean-stage.sh     # Pre-lint artifact cleanup
 ├── custom/                # Runtime: brew/, flatpaks/, ujust/
 ├── .github/
+│   ├── pull.yml                    # pull[bot] main -> stable promotion
 │   ├── workflows/
-│   │   ├── build-image.yml      # Main CI build via projectbluefin/actions
+│   │   ├── build-image.yml      # Testing/stable CI via projectbluefin/actions
 │   │   ├── pr-validation.yml    # Consolidated PR checks
 │   │   ├── renovate.yml         # Self-hosted Renovate runner
 │   │   └── validate-*.yml       # Per-tool validation workflows

@@ -29,10 +29,12 @@ metadata:
 2. **Rename all 7 locations** (see table below)
 3. **Enable GitHub Actions** in the new repository
 4. **Add `RENOVATE_TOKEN` secret** (Classic PAT with `repo` + `workflow` scopes)
-5. **Configure branch protection and auto-merge**
-6. **Trigger first build**
-7. **Add the "What Makes this Raptor Different" section to README**
-8. **Enable signing** (optional, recommended for production)
+5. **Create `stable` from `main`**
+6. **Replace `OWNER` in `.github/pull.yml` and install the pull GitHub App**
+7. **Configure branch protection and auto-merge**
+8. **Trigger the first testing build and approve promotion**
+9. **Add the "What Makes this Raptor Different" section to README**
+10. **Enable signing** (optional, recommended for production)
 
 ## The Seven Rename Locations
 
@@ -84,18 +86,29 @@ This token allows Renovate to open PRs for digest bumps and dependency updates.
 
 This ensures PRs are validated before merging and Renovate can auto-merge safe digest updates.
 
+### Configure `stable` Promotion
+
+1. Create and push `stable` from the current `main`.
+2. Replace each `OWNER` placeholder in `.github/pull.yml` with your GitHub username.
+3. Install the [pull GitHub App](https://github.com/apps/pull) for the repository.
+4. Protect `stable` from direct pushes and require promotion pull requests and successful checks.
+
+All feature and Renovate pull requests target `main`. Never make independent commits on `stable`.
+
 ## First Green Build
 
 After the rename and secret setup, trigger a build:
 
 - **Option A**: Push any commit to `main` (e.g., edit `README.md` with the raptor section)
-- **Option B**: Go to **Actions → build-image → Run workflow → main**
+- **Option B**: Go to **Actions -> Build and Push Image -> Run workflow -> main**
 
 Monitor the workflow. A successful first build:
 
 - Passes `bootc container lint --fatal-warnings`
-- Publishes `:stable` and `:stable.YYYYMMDD` tags to GHCR
+- Publishes the `:stable-testing` candidate to GHCR
 - Appears under **Packages** in your repository
+
+Test the candidate, then approve the pull[bot] promotion PR. The resulting build on `stable` publishes the production `:stable` image.
 
 ## README "What Makes this Raptor Different" Section
 
@@ -162,10 +175,10 @@ cosign verify \
 
 When setting up the fork, do not over-customize on day one. Use an **iterative approach**:
 
-1. **Phase 1**: Rename, enable Actions, add token, trigger first build
+1. **Phase 1**: Rename, enable Actions, add token, configure `stable` and pull[bot]
 2. **Phase 2**: Add one or two packages, run `just build`, verify locally
-3. **Phase 3**: Add Flatpak/Brew customizations, test in VM (`just run-vm-qcow2`)
-4. **Phase 4**: Enable signing, configure branch protection fully, production-ready
+3. **Phase 3**: Merge to `main`, test `:stable-testing`, and approve promotion
+4. **Phase 4**: Enable signing, verify `:stable`, production-ready
 
 Resist the urge to change everything at once. Each phase validates the previous.
 
@@ -186,6 +199,8 @@ Resist the urge to change everything at once. Each phase validates the previous.
 - `cosign.pub` or `cosign.key` added to the repo
 - Auto-merge not enabled, causing Renovate digest PRs to sit unmerged
 - Branch protection missing `validate` as a required check
+- `stable` missing, receiving direct commits, or diverging from `main`
+- pull GitHub App not installed or `.github/pull.yml` still contains `OWNER`
 - README missing the "What Makes this Raptor Different" section entirely
 
 ## Verification
@@ -195,6 +210,8 @@ Resist the urge to change everything at once. Each phase validates the previous.
 - [ ] `RENOVATE_TOKEN` secret added (Classic PAT, `repo` + `workflow`)?
 - [ ] Auto-merge enabled in repository settings?
 - [ ] Branch protection for `main` configured with `validate` as required check?
-- [ ] First green build succeeded and image published to GHCR?
+- [ ] `stable` created and protected from direct pushes?
+- [ ] pull GitHub App installed and `OWNER` replaced?
+- [ ] First green `:stable-testing` build promoted to `:stable`?
 - [ ] README contains the "What Makes this Raptor Different" section?
 - [ ] Optional signing enabled (or deferred for later)?

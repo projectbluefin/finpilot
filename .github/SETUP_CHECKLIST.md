@@ -5,47 +5,81 @@
 ### 1. Rename Template
 
 - [ ] Update `finpilot` to your name in **7 files** (see `.agents/skills/finpilot-templates.md`):
-  1. `Containerfile` — `ARG IMAGE_NAME` and `ARG IMAGE_VENDOR`
-  2. `Justfile` — `export IMAGE_NAME`
-  3. `README.md` — title
-  4. `artifacthub-repo.yml` — `repositoryID`
-  5. `custom/ujust/README.md` — bootc switch example
-  6. `.github/workflows/clean.yml` — `packages`
-  7. `iso/iso.toml` — bootc switch URL
+  1. `Containerfile` - `ARG IMAGE_NAME` and `ARG IMAGE_VENDOR`
+  2. `Justfile` - `export IMAGE_NAME`
+  3. `README.md` - title
+  4. `artifacthub-repo.yml` - `repositoryID`
+  5. `custom/ujust/README.md` - bootc switch example
+  6. `.github/workflows/clean.yml` - `packages`
+  7. `iso/iso.toml` - bootc switch URL
 
 **Agent skill:** `finpilot-templates.md` (rename rules), `finpilot-onboarding.md` (fork bootstrap)
 
 ### 2. Enable GitHub Actions
 
-- [ ] Settings → Actions → General → Enable workflows
+- [ ] Settings -> Actions -> General -> Enable workflows
 - [ ] Set "Read and write permissions"
 
-### 3. First Push
+### 3. Configure Testing and Production Branches
+
+Create `stable` as an exact copy of `main`, then return to `main`:
 
 ```bash
-git add .
-git commit -m "feat: initial customization"
-git push origin main
+git switch main
+git switch -c stable
+git push --set-upstream origin stable
+git switch main
 ```
 
-### 4. Enable Renovate (Required)
+- [ ] Replace each `OWNER` placeholder in `.github/pull.yml` with your GitHub username
+- [ ] Install the [pull GitHub App](https://github.com/apps/pull) for this repository
+- [ ] Validate the configuration at `https://pull.git.ci/check/YOUR_USERNAME/YOUR_REPO`
+- [ ] Never commit directly to `stable`; pull[bot] must keep it synchronized with `main`
 
-- [ ] Create a **Classic PAT** (Settings → Developer settings → Personal access tokens → Tokens (classic))
+The resulting delivery flow is:
+
+```text
+feature branch
+      |
+      v
+PR -> main -> ghcr.io/OWNER/REPO:stable-testing
+             |
+             v
+       pull[bot] promotion PR
+             |
+             v
+          stable -> ghcr.io/OWNER/REPO:stable
+```
+
+### 4. First Change
+
+Open a pull request targeting `main`. After it merges:
+
+1. Verify the `:stable-testing` image.
+2. Wait for pull[bot] to open the `main` -> `stable` promotion PR.
+3. Approve and merge the promotion PR.
+4. Verify the `:stable` image.
+
+### 5. Enable Renovate (Required)
+
+- [ ] Create a **Classic PAT** (Settings -> Developer settings -> Personal access tokens -> Tokens (classic))
   - Scopes: `repo` (full control) + `workflow` (update workflows)
-- [ ] Add the token as repository secret **`RENOVATE_TOKEN`** (Settings → Secrets and variables → Actions)
-- [ ] Enable **Settings → General → Pull Requests → Allow auto-merge**
+- [ ] Add the token as repository secret **`RENOVATE_TOKEN`** (Settings -> Secrets and variables -> Actions)
+- [ ] Enable **Settings -> General -> Pull Requests -> Allow auto-merge**
 - [ ] Configure branch protection for `main`:
-  - Settings → Branches → Add rule
+  - Settings -> Branches -> Add rule
   - Set **Branch name pattern** to `main`
   - Enable "Require a pull request before merging"
   - Enable "Require status checks to pass before merging"
   - Add `validate` as a required status check
   - Enable "Require branches to be up to date before merging"
-- [ ] Renovate will create a PR to pin your GitHub Actions to SHAs
+- [ ] Protect `stable` from direct pushes and require pull requests and successful checks
+
+Renovate targets `main`; approved changes reach `stable` through the same promotion flow.
 
 **Agent skill:** `finpilot-onboarding.md` (branch protection), `finpilot-ci.md` (Renovate config)
 
-### 5. Add "What Makes this Raptor Different" to README
+### 6. Add "What Makes this Raptor Different" to README
 
 - [ ] Open `README.md`
 - [ ] Paste the raptor section template (see README or `.agents/skills/finpilot-onboarding.md`)
@@ -54,7 +88,16 @@ git push origin main
 
 **Agent skill:** `finpilot-onboarding.md` (raptor section), `finpilot-maintain.md` (maintenance requirement)
 
-### 6. Deploy
+### 7. Deploy
+
+Test the candidate image from `main`:
+
+```bash
+sudo bootc switch --transport registry ghcr.io/YOUR_USERNAME/YOUR_REPO:stable-testing
+sudo systemctl reboot
+```
+
+After approving promotion to `stable`, deploy the production image:
 
 ```bash
 sudo bootc switch --transport registry ghcr.io/YOUR_USERNAME/YOUR_REPO:stable
@@ -65,12 +108,12 @@ sudo systemctl reboot
 
 ### Enable Signing (Recommended)
 
-This template uses keyless OIDC signing — no keys or secrets are required.
+This template uses keyless OIDC signing - no keys or secrets are required.
 
 - [ ] Edit `.github/workflows/build-image.yml`
 - [ ] Find the "OPTIONAL: Sign and attest" section
 - [ ] Uncomment the `Sign and publish` step
-- [ ] Commit and push (via PR to `main`)
+- [ ] Commit through a pull request to `main`
 
 **Agent skill:** `finpilot-templates.md` (signing setup)
 
@@ -87,15 +130,14 @@ The current OCI-native chunkah action does not use `/usr/libexec/bootc-base-imag
 
 ## Agent Handoff Reference
 
-Which skill to load for each checklist block above:
-
-| Checklist step                        | Skill                                             |
-| ------------------------------------- | ------------------------------------------------- |
-| Rename (step 1)                       | `finpilot-templates.md`, `finpilot-onboarding.md` |
-| Enable Actions (step 2)               | `finpilot-onboarding.md`                          |
-| Renovate + branch protection (step 4) | `finpilot-onboarding.md`, `finpilot-ci.md`        |
-| Raptor section (step 5)               | `finpilot-onboarding.md`, `finpilot-maintain.md`  |
-| Signing (optional)                    | `finpilot-templates.md`                           |
-| Rechunking (optional)                 | `finpilot-ci.md`                                  |
+| Checklist step | Skill |
+| --- | --- |
+| Rename (step 1) | `finpilot-templates.md`, `finpilot-onboarding.md` |
+| Enable Actions (step 2) | `finpilot-onboarding.md` |
+| Branches and pull[bot] (step 3) | `finpilot-onboarding.md`, `finpilot-ci.md` |
+| Renovate + branch protection (step 5) | `finpilot-onboarding.md`, `finpilot-ci.md` |
+| Raptor section (step 6) | `finpilot-onboarding.md`, `finpilot-maintain.md` |
+| Signing (optional) | `finpilot-templates.md` |
+| Rechunking (optional) | `finpilot-ci.md` |
 
 **Cross-link requirement**: Whenever you add or remove a package, app, or service **after** initial setup, update the README raptor section and its `*Last updated*` date. This is required per `.agents/skills/finpilot-maintain.md`.

@@ -31,7 +31,8 @@ metadata:
 2. **Update README raptor section** whenever packages or configuration change
 3. **Run local test loop** before opening PRs
 4. **Open PRs to `main`** — never push directly
-5. **Enable signing** when ready for production
+5. **Test `:stable-testing` before approving pull[bot] promotion**
+6. **Enable signing** when ready for production
 
 ## Handle Renovate Digest PRs
 
@@ -87,6 +88,7 @@ Signing is **disabled by default** to allow first builds to succeed. Enable when
 2. Find the `# OPTIONAL: Sign and attest` section
 3. Uncomment the `Sign and publish` step
 4. Commit and push (via PR to `main`)
+5. Test the signed `:stable-testing` image and approve promotion
 
 ### Verification After Enablement
 
@@ -143,8 +145,10 @@ just run-vm-iso
 ### Always Open a PR to `main`
 
 - Direct pushes to `main` are **not recommended**
+- Direct pushes and independent changes to `stable` are **not allowed**
 - PRs trigger `pr-validation.yml` and other `validate-*.yml` checks
 - Branch protection should require PRs with the `validate` status check
+- pull[bot] promotes approved `main` commits to `stable` after candidate testing
 
 ### PR Best Practices
 
@@ -173,6 +177,7 @@ If Renovate is not creating PRs, check:
 
 - Review and merge Renovate PRs
 - Check that `validate` checks are passing on `main`
+- Test pending `:stable-testing` images and review promotion PRs
 
 ### Monthly
 
@@ -210,6 +215,7 @@ If Renovate is not creating PRs, check:
 - README raptor section missing or severely outdated
 - No local builds run before PRs are opened
 - Direct pushes to `main` bypassing branch protection
+- Direct commits to `stable` or untested promotion PRs
 - Signing still disabled after months of production use
 - `RENOVATE_TOKEN` expired (Renovate workflow fails)
 
@@ -219,5 +225,6 @@ If Renovate is not creating PRs, check:
 - [ ] Is the README raptor section updated for the latest changes?
 - [ ] Was `just build` run locally before the last PR?
 - [ ] Are all pushes to `main` via PR with passing `validate` check?
+- [ ] Are `stable` updates promoted by pull[bot] only after testing `:stable-testing`?
 - [ ] Is image signing enabled (or on the roadmap for production)?
 - [ ] Is `RENOVATE_TOKEN` valid and the Renovate workflow running?
