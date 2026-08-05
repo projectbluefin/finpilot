@@ -10,9 +10,10 @@ file whose frontmatter tells compatible agents when to load it.
 
 | Skill | What it covers |
 |---|---|
-| [`finpilot-overview`](finpilot-overview/SKILL.md) | Repository architecture, file layout, and the task router table. **Start here.** |
-| [`finpilot-onboarding`](finpilot-onboarding/SKILL.md) | Bootstrap a new fork: rename, enable Actions, first green build, signing. |
-| [`finpilot-templates`](finpilot-templates/SKILL.md) | The 7 rename locations and template-repo maintenance rules. |
+| [`finpilot-router`](finpilot-router/SKILL.md) | The task routing table: which skill covers what, and the standard sequence. Load when unsure. |
+| [`finpilot-overview`](finpilot-overview/SKILL.md) | Repository architecture and file layout. Start here for orientation. |
+| [`finpilot-onboarding`](finpilot-onboarding/SKILL.md) | Bootstrap a new fork: rename, enable Actions, first green build, raptor section, branch protection. |
+| [`finpilot-templates`](finpilot-templates/SKILL.md) | The 7 rename locations, image identity ARGs, signing setup, AGENTS.md update rules. |
 | [`finpilot-packages`](finpilot-packages/SKILL.md) | Decision tree: where to add packages (dnf5, Brew, Flatpak). |
 | [`finpilot-custom`](finpilot-custom/SKILL.md) | Runtime layer: Brewfiles, Flatpaks, ujust, and validation. |
 | [`finpilot-build`](finpilot-build/SKILL.md) | Containerfile, Justfile, build scripts, image pinning, advanced topics. |
@@ -22,18 +23,8 @@ file whose frontmatter tells compatible agents when to load it.
 | [`finpilot-pr-checklist`](finpilot-pr-checklist/SKILL.md) | Pre-commit and per-change-type validation checklists. |
 | [`finpilot-examples`](finpilot-examples/SKILL.md) | Runnable example scripts and the `.example` → `.sh` activation pattern. |
 
-## Quick Router
-
-| I need to… | Read this skill |
-|---|---|
-| Bootstrap a new fork from this template | `finpilot-onboarding` |
-| Add/remove a package or app | `finpilot-packages` |
-| Change Brewfiles, Flatpaks, or ujust | `finpilot-custom` |
-| Change Containerfile, Justfile, or build scripts | `finpilot-build` |
-| Fix CI or Renovate | `finpilot-ci` / `finpilot-maintain` |
-| Open a PR | `finpilot-pr-checklist` |
-| Debug a build or deploy failure | `finpilot-troubleshooting` |
-| Follow a worked example | `finpilot-examples` |
+Looking for "I need to… → which skill?" — that table lives in
+[`finpilot-router`](finpilot-router/SKILL.md), its single canonical home.
 
 ## How to Extend Skills
 
@@ -43,7 +34,8 @@ When adding a new skill:
 2. **Add `SKILL.md`** with `name` and `description` frontmatter; `name` must match the directory
 3. **Describe when to use the skill** precisely so agents can select it automatically
 4. **Include the standard sections**: When to Use, When NOT to Use, Core Process, Common Rationalizations, Red Flags, Verification
-5. **Add the skill to this README** and the `finpilot-overview` task router
+5. **Add the skill to this README** and to the routing table in `finpilot-router/SKILL.md`
+6. **Keep `SKILL.md` focused** — split deep sub-topics into sibling `.md` files in the same directory and link them from `SKILL.md` (relative links, e.g. `[AGENT-BRIEF.md](AGENT-BRIEF.md)`)
 
 ## References
 

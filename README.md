@@ -308,15 +308,6 @@ Your workflow will:
 - Sign all images using keyless OIDC signing
 - Provide cryptographic proof of authenticity via SLSA build provenance attestation
 
-Users can verify your images with:
-
-```bash
-cosign verify \
-  --certificate-identity-regexp="https://github.com/your-username/your-repo-name/.github/workflows/" \
-  --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-  ghcr.io/your-username/your-repo-name:stable
-```
-
 ## Detailed Guides
 
 - [Homebrew/Brewfiles](custom/brew/README.md) - Runtime package management

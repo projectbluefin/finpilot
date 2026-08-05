@@ -1,10 +1,9 @@
 ---
 name: finpilot-custom
 description: >-
-  Runtime layer documentation for Brewfiles, Flatpaks, and ujust commands.
-  Covers syntax, placement, validation workflows, and the critical rule:
-  NEVER use dnf5 in just files. Use when modifying custom/ or explaining
-  the runtime layer to contributors.
+  Runtime layer of finpilot: Brewfiles, Flatpaks, and ujust commands — syntax,
+  placement, and validation. Use when modifying custom/ or explaining the
+  runtime layer to contributors.
 ---
 
 # finpilot Runtime Layer
@@ -32,7 +31,7 @@ description: >-
 
 ## Brewfiles: `custom/brew/*.Brewfile`
 
-Brewfiles use Ruby syntax. They define Homebrew packages installed by users after deployment.
+Brewfiles use Ruby syntax. They define Homebrew packages installed by users after deployment. Homebrew itself is pre-staged at build time via the `@ublue-os/brew` OCI container and extracted on first boot by `brew-setup.service`; Brewfiles define what users install after that extraction.
 
 ### File Locations
 
@@ -107,14 +106,10 @@ Branch=stable
 
 ### Key Rules
 
-- **Post-first-boot only**: Flatpaks are NOT baked into the ISO or container. They install on first boot with internet access.
+- **Post-first-boot only**: Flatpaks are NOT baked into the ISO or container. They install on first boot with internet access — do not rely on them in offline scenarios or ISO-based installs without network.
 - **Always specify `Branch=stable`** (or another valid branch)
 - **Find app IDs at https://flathub.org/**
 - **Validation**: `validate-flatpaks.yml` checks that app IDs exist on Flathub
-
-### Important Note
-
-Flatpaks require an internet connection on first boot. Do not rely on them being available in offline scenarios or during ISO-based installs without network.
 
 ## ujust: `custom/ujust/*.just`
 

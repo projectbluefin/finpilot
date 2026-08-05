@@ -3,7 +3,7 @@ name: finpilot-overview
 description: >-
   Architecture, repo layout, and factory role for the finpilot template.
   Use when orienting to the repository, understanding how it relates to
-  projectbluefin/actions, or deciding which skill to read next.
+  projectbluefin/actions, or before picking a skill with finpilot-router.
 ---
 
 # finpilot Overview
@@ -12,7 +12,7 @@ description: >-
 
 - Starting a new session in this repo
 - Explaining how finpilot relates to bluefin/aurora/dakota
-- Deciding which Agent Skill covers your change area
+- Orienting before using `finpilot-router` to pick a skill
 - Onboarding a new contributor or agent
 
 ## When NOT to Use
@@ -22,7 +22,7 @@ description: >-
 
 ## Core Process
 
-1. **Read AGENTS.md `## Start here`** for repository-wide rules
+1. **Read AGENTS.md `## Start here`** for repository-wide rules and the skill sequence
 2. **Identify your change area** (Containerfile/Justfile → build, workflows → ci, template init → templates)
 3. **Load the relevant skill** before touching anything
 4. **Verify against current patterns** in `projectbluefin/actions` before deviating
@@ -80,20 +80,10 @@ pipeline repo itself, but it adopts the same composite workflow actions as bluef
 - Renovate config extends `config:best-practices` and tracks OCI digests
 - Image metadata (`image-info.json`) follows the ublue-os convention
 
-## Task Router ("I need to…")
+## Task Router
 
-| I need to…                                       | Load this skill                           |
-| ------------------------------------------------ | ----------------------------------------- |
-| Bootstrap a new fork from this template          | `finpilot-onboarding`                  |
-| Add/remove a package or app                      | `finpilot-packages`                    |
-| Change Brewfiles, Flatpaks, or ujust             | `finpilot-custom`                      |
-| Change Containerfile, Justfile, or build scripts | `finpilot-build`                       |
-| Fix CI or Renovate                               | `finpilot-ci` / `finpilot-maintain`    |
-| Open a PR                                        | `finpilot-pr-checklist`                |
-| Debug a build or deploy failure                  | `finpilot-troubleshooting`             |
-| Follow a worked example                          | `finpilot-examples`                    |
-| Orient to repo architecture                      | `finpilot-overview` (this skill)       |
-| Initialize or rename this template               | `finpilot-templates`                   |
+The canonical task → skill routing table lives in the `finpilot-router` skill —
+load it when you don't know which skill covers a task.
 
 ## Scope Rules
 

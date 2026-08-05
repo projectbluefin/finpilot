@@ -76,7 +76,7 @@ All NVIDIA logic is self-contained in the script. It provisions NVIDIA support d
 **What it does:**
 
 - Adds the 1Password repository
-- Installs `1password` and `1password-cli`
+- Installs `1password`
 - Removes the repo file after install (isolated install pattern)
 
 **How to activate:**
@@ -124,7 +124,7 @@ When adding a new pattern that others might reuse, create an `.example` file:
 1. **Name it** with the correct prefix: `20-` for third-party repos, `30-` for desktop swaps
 2. **Include comments** explaining what it does and how to customize
 3. **Follow conventions**: `set -euo pipefail`, `dnf5`, `copr_install_isolated` for COPRs
-4. **Add to this skill** (or `AGENTS.md`) so agents know it exists
+4. **Add the new example to this skill** so agents discover it
 
 ### Template for New Examples
 

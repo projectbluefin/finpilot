@@ -18,7 +18,7 @@ description: >-
 ## When NOT to Use
 
 - CI workflow changes (`.github/workflows/`) — use `finpilot-ci`
-- Runtime customizations (`custom/`) — use the README.md guides
+- Runtime customizations (`custom/`) — use `finpilot-custom`
 
 ## Core Process
 

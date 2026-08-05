@@ -105,77 +105,26 @@ See `build/20-onepassword.sh.example` for a complete working example.
 
 ## Runtime Brew: `custom/brew/*.Brewfile`
 
-Homebrew packages are installed by users after deployment. Best for CLI tools and development environments.
-
-**Note:** Homebrew itself is pre-staged at build time via `@ublue-os/brew` OCI container and extracted on first boot by `brew-setup.service`. Brewfiles define what users install *after* that extraction.
-
-**Files:**
-
-- `custom/brew/default.Brewfile` — General purpose CLI tools
-- `custom/brew/development.Brewfile` — Development tools and environments
-- `custom/brew/fonts.Brewfile` — Font packages
-- Create custom `*.Brewfile` as needed
-
-**Example:**
-
-```ruby
-# In custom/brew/default.Brewfile
-brew "bat"        # cat with syntax highlighting
-brew "eza"        # Modern replacement for ls
-brew "ripgrep"    # Faster grep
-brew "fd"         # Simple alternative to find
-```
-
-**Users install via:** `ujust install-default-apps` (shortcut in `custom/ujust/`)
+Homebrew is for CLI tools and development environments, installed by users
+after first boot. File locations, syntax, and validation:
+`finpilot-custom`.
 
 ## Runtime Flatpak: `custom/flatpaks/*.preinstall`
 
-Flatpak applications are GUI apps installed after first boot. Use INI format.
-
-**Files:**
-
-- `custom/flatpaks/default.preinstall` — Default GUI applications
-- Create custom `*.preinstall` files as needed
-
-**Example:**
-
-```ini
-# In custom/flatpaks/default.preinstall
-[Flatpak Preinstall org.mozilla.firefox]
-Branch=stable
-
-[Flatpak Preinstall com.visualstudio.code]
-Branch=stable
-```
-
-**Important:**
-
-- Installed post-first-boot (not in ISO/container)
-- Requires internet connection
-- Find app IDs at https://flathub.org/
-- Always specify `Branch=stable` (or another branch)
+Flatpaks are for GUI apps, installed post-first-boot (not in the ISO or
+container). INI syntax, `Branch=stable`, Flathub ID lookup, and validation:
+`finpilot-custom`.
 
 ## Scope Rules
 
 ### Doc Tasks (No CI Impact)
 
-Changes that DO NOT trigger a CI build or validation:
-
-- Editing `README.md` (except if it changes build instructions)
-- Adding comments in build scripts
-- Updating `.gitignore`
-- Updating documentation in `custom/ujust/README.md`
+README edits, comments, `.gitignore`, and `custom/ujust/README.md` trigger no CI.
 
 ### CI Tasks (Trigger Validation/Build)
 
-Changes that DO trigger CI workflows:
-
-- Editing `build/*.sh` → triggers `pr-validation.yml` (shellcheck)
-- Editing `Containerfile` → triggers `pr-validation.yml` (hadolint) + build
-- Editing `custom/brew/*.Brewfile` → triggers `validate-brewfiles.yml`
-- Editing `custom/flatpaks/*.preinstall` → triggers `validate-flatpaks.yml`
-- Editing `Justfile` or `custom/ujust/*.just` → triggers `validate-justfiles.yml`
-- Editing `.github/workflows/*.yml` → triggers `actionlint` and build validation
+Which `validate-*.yml` workflow fires for your file type — see the Workflow Map
+in `finpilot-ci`.
 
 ## Common Rationalizations
 
@@ -201,6 +150,6 @@ Changes that DO trigger CI workflows:
 - [ ] For build-time: does it use `dnf5 install -y`?
 - [ ] For COPR: is `copr_install_isolated` used?
 - [ ] For third-party repo: is the repo file removed at end of script?
-- [ ] For BrewFraction: is the app ID verified on Flathub?
+- [ ] For Flatpak: is the app ID verified on Flathub?
 - [ ] For Brewfile: does `brew bundle check --file` pass locally?
-- [ ] Does the PR include the corresponding `validate-*.yml` trigger if applicable?
+- [ ] Does the changed path trigger the correct `validate-*.yml` workflow?

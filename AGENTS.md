@@ -6,11 +6,13 @@ Task-specific instructions are Agent Skills under
 `.agents/skills/<skill-name>/SKILL.md`. Agents discover them automatically from
 their descriptions. Use the matching skill before changing behavior; for an
 unfamiliar multi-phase task, start with `finpilot-overview`, continue with the
-domain skill, and finish with `finpilot-pr-checklist`.
+domain skill, and finish with `finpilot-pr-checklist`. Not sure which skill
+fits? Load `finpilot-router` — it owns the routing table.
 
-- `finpilot-overview` — architecture, repo layout, task router
-- `finpilot-onboarding` — fork bootstrap: rename, Actions, token, first build
-- `finpilot-templates` — template initialization and rename rules
+- `finpilot-router` — task routing: which skill covers what
+- `finpilot-overview` — architecture and repo layout
+- `finpilot-onboarding` — fork bootstrap: rename, Actions, token, first build, raptor section
+- `finpilot-templates` — rename rules, image identity ARGs, signing setup
 - `finpilot-packages` — decision tree (dnf5 vs Brew vs Flatpak)
 - `finpilot-custom` — Brewfiles, Flatpaks, ujust rules
 - `finpilot-build` — Containerfile, Justfile, build scripts
@@ -19,21 +21,6 @@ domain skill, and finish with `finpilot-pr-checklist`.
 - `finpilot-troubleshooting` — symptom → cause → fix
 - `finpilot-pr-checklist` — PR gates by change type
 - `finpilot-examples` — runnable examples and activation patterns
-
-### Task Router
-
-| I need to…                                     | Load                                      |
-| ---------------------------------------------- | ----------------------------------------- |
-| Bootstrap a new fork                           | `finpilot-onboarding`                  |
-| Add/remove a package                           | `finpilot-packages`                    |
-| Change Brewfiles, Flatpaks, or ujust           | `finpilot-custom`                      |
-| Change Containerfile, Justfile, or build/\*.sh | `finpilot-build`                       |
-| Fix CI or Renovate                             | `finpilot-ci` / `finpilot-maintain`    |
-| Open a PR                                      | `finpilot-pr-checklist`                |
-| Debug a build or deploy failure                | `finpilot-troubleshooting`             |
-| Follow a worked example                        | `finpilot-examples`                    |
-| Initialize/ rename this template               | `finpilot-templates`                   |
-| Orient to repo architecture                    | `finpilot-overview`                    |
 
 ## CRITICAL: GitHub API Usage
 

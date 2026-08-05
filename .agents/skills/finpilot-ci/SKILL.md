@@ -3,7 +3,7 @@ name: finpilot-ci
 description: >-
   GitHub Actions workflows, projectbluefin/actions composite actions,
   Renovate configuration, and PR validation for finpilot.
-  Use when changing .github/workflows/, renovate.json, or .hadolint.yaml.
+  Use when changing .github/workflows/, .github/renovate.json, or .hadolint.yaml.
 ---
 
 # finpilot CI
@@ -19,7 +19,7 @@ description: >-
 ## When NOT to Use
 
 - Containerfile / Justfile / build script changes — use `finpilot-build`
-- Runtime customisations — use README.md guides
+- Runtime customisations — use `finpilot-custom`
 
 ## Core Process
 
@@ -40,7 +40,7 @@ description: >-
 | `validate-brewfiles.yml` | PR paths: `custom/brew/**`        | Homebrew Brewfile syntax check                       |
 | `validate-flatpaks.yml`  | PR paths: `custom/flatpaks/**`    | Flathub app ID existence check                       |
 | `validate-justfiles.yml` | PR paths: `Justfile`              | `just --list` syntax check                           |
-| `validate-renovate.yml`  | PR paths: `renovate.json`         | `renovate-config-validator`                          |
+| `validate-renovate.yml`  | PR paths: `.github/renovate.json` | `renovate-config-validator`                          |
 
 ## Composite Action Pins
 
@@ -117,29 +117,20 @@ to users' machines.
 
 ## Renovate OCI Digest Tracking
 
-All OCI image digests are pinned inline in `Containerfile` `FROM` lines and tracked
-by Renovate's built-in `dockerfile` manager:
-
-```dockerfile
-FROM ghcr.io/projectbluefin/common:latest@sha256:<current> AS common
-FROM ghcr.io/ublue-os/brew:latest@sha256:<current> AS brew
-ARG FEDORA_MAJOR_VERSION="44"
-FROM quay.io/fedora-ostree-desktops/silverblue:44@sha256:<current>
-```
+All OCI image digests are pinned inline in `Containerfile` `FROM` lines and
+tracked by Renovate's built-in `dockerfile` manager — pinning pattern:
+`finpilot-build`.
 
 When Renovate updates a digest it opens a PR that changes only the relevant
 `Containerfile` line. The next CI build uses it directly.
 
 ## Renovate Workflow Requirements
 
-The self-hosted Renovate runner requires a `RENOVATE_TOKEN` secret:
-
-- **Classic PAT** with `repo` + `workflow` scopes
-- Set in repository secrets as `RENOVATE_TOKEN`
-- The `check-token-health` composite action validates this at the start of the workflow
-
-If `RENOVATE_TOKEN` is missing or expired, the workflow fails **before** running Renovate —
-not midway through — thanks to the preflight check.
+The self-hosted Renovate runner requires a `RENOVATE_TOKEN` (Classic PAT with
+`repo` + `workflow` scopes; creation: `finpilot-onboarding`). The
+`check-token-health` composite action validates it at the start of the workflow,
+so a missing or expired token fails the workflow **before** running Renovate —
+not midway through.
 
 ## hadolint Config (.hadolint.yaml)
 

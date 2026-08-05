@@ -1,35 +1,34 @@
 ---
 name: finpilot-templates
 description: >-
-  Template initialization, fork setup, renaming conventions, and the
-  seven files that must be updated when creating a new image from finpilot.
-  Use when initializing a fork, updating AGENTS.md, or documenting setup.
+  Template identity rules: the seven rename locations, image identity ARGs,
+  keyless signing setup, and AGENTS.md update rules. Use when renaming a fork,
+  enabling signing, or updating AGENTS.md and setup docs.
 ---
 
 # finpilot Templates & Fork Setup
 
 ## When to Use
 
-- Initializing a new custom OS image from this template
+- Renaming `finpilot` in a fork (the 7 locations)
+- Enabling or explaining keyless signing
 - Updating AGENTS.md or copilot instructions
 - Updating README.md setup sections or SETUP_CHECKLIST.md
 - Documenting new mandatory setup steps for forks
 
 ## When NOT to Use
 
+- First-time fork bootstrap procedure — use `finpilot-onboarding`
 - Build system changes — use `finpilot-build`
 - CI workflow changes — use `finpilot-ci`
 
-## Core Process: Creating a New Fork
+## Core Process
 
-1. **Click "Use this template"** on GitHub → create new repository
-2. **Rename `finpilot` in exactly 7 files** (see table below)
-3. **Enable GitHub Actions** in the Actions tab
-4. **Add `RENOVATE_TOKEN` secret** (Classic PAT, `repo` + `workflow` scopes)
-5. **Enable auto-merge** (Settings → General → Pull Requests → Allow auto-merge)
-6. **Configure branch protection for `main`** with `validate` as required check
-7. **Trigger first build** — push any commit or run the workflow manually
-8. **Enable signing** (optional) — uncomment `sign-and-publish` step in `build-image.yml`
+1. **Rename in the 7 locations** (table below)
+2. **Check the image identity ARGs** match the new name (below)
+3. **Enable keyless signing** when the fork is production-ready (below)
+4. **Update AGENTS.md** per the rules below
+5. **Verify** against the checklist at the end of this skill
 
 ## The Seven Rename Locations
 
@@ -41,7 +40,7 @@ When forking, change `finpilot` → your image name in exactly these locations:
 | 2   | `Justfile`                    | `export IMAGE_NAME := env("IMAGE_NAME", "finpilot")`                |
 | 3   | `README.md`                   | Title `# finpilot`                                                  |
 | 4   | `artifacthub-repo.yml`        | `repositoryID: finpilot`                                            |
-| 5   | `custom/ujust/README.md`      | `localhost/finpilot:stable` in the bootc switch example             |
+| 5   | `custom/ujust/README.md`      | `localhost/your-repo-name:stable` in the bootc switch example    |
 | 6   | `.github/workflows/clean.yml` | `packages: finpilot`                                                |
 | 7   | `iso/iso.toml`                | `ghcr.io/USERNAME/REPO:stable` in the bootc switch URL              |
 
@@ -85,13 +84,14 @@ cosign verify \
 
 **Never** add a `cosign.pub` file with a placeholder — it is misleading and was removed.
 Static-key signing (`SIGNING_SECRET`) is not supported by this template.
+**Never commit `cosign.key`** — it is `.gitignore`-d as a safety net.
 
 ## AGENTS.md Update Rules
 
 `AGENTS.md` is the Copilot instructions file. When updating it:
 
 - **Line-number references are fragile** — use semantic references (`ARG IMAGE_NAME`, `FROM`) not line numbers
-- **Keep the `## Start here` section pointing to the skills router table** — this is the factory pattern
+- **Keep the `## Start here` section pointing at the skills and the router** — this is the factory pattern
 - **Update `Last Updated` date** on every substantive change
 - **Do not add resolved items** (PR numbers, "✅ done" entries) — those belong in git history
 
@@ -114,9 +114,7 @@ Static-key signing (`SIGNING_SECRET`) is not supported by this template.
 ## Verification
 
 - [ ] All 7 rename locations updated?
-- [ ] GitHub Actions enabled in the fork?
-- [ ] `RENOVATE_TOKEN` secret added?
-- [ ] Auto-merge enabled in repository settings?
-- [ ] Branch protection for `main` configured with `validate` as required check?
-- [ ] First build triggered and succeeded?
+- [ ] `IMAGE_NAME` / `IMAGE_VENDOR` ARGs match the fork?
+- [ ] Signing enabled only via keyless OIDC (no `cosign.key`/`cosign.pub`)?
+- [ ] `AGENTS.md` uses semantic references (no line numbers)?
 - [ ] `AGENTS.md` `Last Updated` date current?
