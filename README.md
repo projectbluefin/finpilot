@@ -16,7 +16,7 @@ Here are the changes from [Base Image Name]. This image is based on [Bluefin/Baz
 
 ### Added Packages (Build-time)
 
-- **System packages**: tmux, micro, mosh - [brief explanation of why]
+- **System packages**: `tmux` and `gum` — tmux is the template's package-manager cache smoke test, and gum provides the interactive prompts used by the default ujust recipes.
 
 ### Added Applications (Runtime)
 
