@@ -74,16 +74,28 @@ This template uses keyless OIDC signing — no keys or secrets are required.
 
 **Agent skill:** `finpilot-templates` (signing setup)
 
+### Enable Rechunking (Optional)
+
+- [ ] Edit `.github/workflows/build-image.yml`
+- [ ] Set `ENABLE_RECHUNKING: "true"`
+- [ ] Keep the default `RECHUNK_MAX_LAYERS: "128"` unless you have measured a reason to change it
+- [ ] Confirm a publish build completes before deploying the new image
+
+The current OCI-native chunkah action does not use `/usr/libexec/bootc-base-imagectl`. Package cadence classification is a separate advanced setup and is not required for basic rechunking.
+
+**Agent skill:** `finpilot-ci` (rechunking compatibility and workflow setup)
+
 ## Agent Handoff Reference
 
 Which skill to load for each checklist block above:
 
-| Checklist step                        | Skill                                           |
-| ------------------------------------- | ----------------------------------------------- |
-| Rename (step 1)                       | `finpilot-templates`, `finpilot-onboarding`     |
-| Enable Actions (step 2)               | `finpilot-onboarding`                           |
-| Renovate + branch protection (step 4) | `finpilot-onboarding`, `finpilot-ci`            |
-| Raptor section (step 5)               | `finpilot-onboarding`, `finpilot-maintain`      |
-| Signing (optional)                    | `finpilot-templates`                            |
+| Checklist step                        | Skill                                       |
+| ------------------------------------- | ------------------------------------------- |
+| Rename (step 1)                       | `finpilot-templates`, `finpilot-onboarding` |
+| Enable Actions (step 2)               | `finpilot-onboarding`                       |
+| Renovate + branch protection (step 4) | `finpilot-onboarding`, `finpilot-ci`        |
+| Raptor section (step 5)               | `finpilot-onboarding`, `finpilot-maintain`  |
+| Signing (optional)                    | `finpilot-templates`                        |
+| Rechunking (optional)                 | `finpilot-ci`                               |
 
 **Cross-link requirement**: Whenever you add or remove a package, app, or service **after** initial setup, update the README raptor section and its `*Last updated*` date. This is required by the `finpilot-maintain` skill.
