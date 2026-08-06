@@ -1,3 +1,5 @@
+# pull[bot] promotes tested commits from `main` to `stable`.
+# Forks: replace `castrojo` below with your own GitHub username.
 version: "1"
 rules:
   - base: stable
@@ -5,8 +7,8 @@ rules:
     mergeMethod: hardreset
     mergeUnstable: false
     reviewers:
-      - OWNER
+      - castrojo
     conflictReviewers:
-      - OWNER
+      - castrojo
 label: "promotion"
 conflictLabel: "promotion-conflict"

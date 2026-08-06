@@ -4,20 +4,20 @@
 
 ### 1. Rename Template
 
-- [ ] Update `finpilot` to your name in **7 files** (see `.agents/skills/finpilot-templates.md`):
-  1. `Containerfile` - `ARG IMAGE_NAME` and `ARG IMAGE_VENDOR`
-  2. `Justfile` - `export IMAGE_NAME`
-  3. `README.md` - title
-  4. `artifacthub-repo.yml` - `repositoryID`
-  5. `custom/ujust/README.md` - bootc switch example
-  6. `.github/workflows/clean.yml` - `packages`
-  7. `iso/iso.toml` - bootc switch URL
+- [ ] Update `finpilot` to your name in **7 files** (see `finpilot-templates`):
+  1. `Containerfile` — `ARG IMAGE_NAME` and `ARG IMAGE_VENDOR`
+  2. `Justfile` — `export IMAGE_NAME`
+  3. `README.md` — title
+  4. `artifacthub-repo.yml` — `repositoryID`
+  5. `custom/ujust/README.md` — bootc switch example
+  6. `.github/workflows/clean.yml` — `packages`
+  7. `iso/iso.toml` — bootc switch URL
 
-**Agent skill:** `finpilot-templates.md` (rename rules), `finpilot-onboarding.md` (fork bootstrap)
+**Agent skill:** `finpilot-templates` (rename rules), `finpilot-onboarding` (fork bootstrap)
 
 ### 2. Enable GitHub Actions
 
-- [ ] Settings -> Actions -> General -> Enable workflows
+- [ ] Settings → Actions → General → Enable workflows
 - [ ] Set "Read and write permissions"
 
 ### 3. Configure Testing and Production Branches
@@ -31,7 +31,7 @@ git push --set-upstream origin stable
 git switch main
 ```
 
-- [ ] Replace each `OWNER` placeholder in `.github/pull.yml` with your GitHub username
+- [ ] Replace `castrojo` in `.github/pull.yml` (`reviewers` and `conflictReviewers`) with your GitHub username
 - [ ] Install the [pull GitHub App](https://github.com/apps/pull) for this repository
 - [ ] Validate the configuration at `https://pull.git.ci/check/YOUR_USERNAME/YOUR_REPO`
 - [ ] Never commit directly to `stable`; pull[bot] must keep it synchronized with `main`
@@ -62,12 +62,12 @@ Open a pull request targeting `main`. After it merges:
 
 ### 5. Enable Renovate (Required)
 
-- [ ] Create a **Classic PAT** (Settings -> Developer settings -> Personal access tokens -> Tokens (classic))
+- [ ] Create a **Classic PAT** (Settings → Developer settings → Personal access tokens → Tokens (classic))
   - Scopes: `repo` (full control) + `workflow` (update workflows)
-- [ ] Add the token as repository secret **`RENOVATE_TOKEN`** (Settings -> Secrets and variables -> Actions)
-- [ ] Enable **Settings -> General -> Pull Requests -> Allow auto-merge**
+- [ ] Add the token as repository secret **`RENOVATE_TOKEN`** (Settings → Secrets and variables → Actions)
+- [ ] Enable **Settings → General → Pull Requests → Allow auto-merge**
 - [ ] Configure branch protection for `main`:
-  - Settings -> Branches -> Add rule
+  - Settings → Branches → Add rule
   - Set **Branch name pattern** to `main`
   - Enable "Require a pull request before merging"
   - Enable "Require status checks to pass before merging"
@@ -77,16 +77,16 @@ Open a pull request targeting `main`. After it merges:
 
 Renovate targets `main`; approved changes reach `stable` through the same promotion flow.
 
-**Agent skill:** `finpilot-onboarding.md` (branch protection), `finpilot-ci.md` (Renovate config)
+**Agent skill:** `finpilot-onboarding` (branch protection), `finpilot-ci` (Renovate config)
 
 ### 6. Add "What Makes this Raptor Different" to README
 
 - [ ] Open `README.md`
-- [ ] Paste the raptor section template (see README or `.agents/skills/finpilot-onboarding.md`)
+- [ ] Paste the raptor section template (see README or `finpilot-onboarding`)
 - [ ] Fill in placeholders with your planned customizations
 - [ ] Update the `*Last updated: [date]*` timestamp
 
-**Agent skill:** `finpilot-onboarding.md` (raptor section), `finpilot-maintain.md` (maintenance requirement)
+**Agent skill:** `finpilot-onboarding` (raptor section), `finpilot-maintain` (maintenance requirement)
 
 ### 7. Deploy
 
@@ -108,36 +108,24 @@ sudo systemctl reboot
 
 ### Enable Signing (Recommended)
 
-This template uses keyless OIDC signing - no keys or secrets are required.
+This template uses keyless OIDC signing — no keys or secrets are required.
 
 - [ ] Edit `.github/workflows/build-image.yml`
 - [ ] Find the "OPTIONAL: Sign and attest" section
 - [ ] Uncomment the `Sign and publish` step
 - [ ] Commit through a pull request to `main`
 
-**Agent skill:** `finpilot-templates.md` (signing setup)
-
-### Enable Rechunking (Optional)
-
-- [ ] Edit `.github/workflows/build-image.yml`
-- [ ] Set `ENABLE_RECHUNKING: "true"`
-- [ ] Keep the default `RECHUNK_MAX_LAYERS: "128"` unless you have measured a reason to change it
-- [ ] Confirm a publish build completes before deploying the new image
-
-The current OCI-native chunkah action does not use `/usr/libexec/bootc-base-imagectl`. Package cadence classification is a separate advanced setup and is not required for basic rechunking.
-
-**Agent skill:** `finpilot-ci.md` (rechunking compatibility and workflow setup)
+**Agent skill:** `finpilot-templates` (signing setup)
 
 ## Agent Handoff Reference
 
 | Checklist step | Skill |
 | --- | --- |
-| Rename (step 1) | `finpilot-templates.md`, `finpilot-onboarding.md` |
-| Enable Actions (step 2) | `finpilot-onboarding.md` |
-| Branches and pull[bot] (step 3) | `finpilot-onboarding.md`, `finpilot-ci.md` |
-| Renovate + branch protection (step 5) | `finpilot-onboarding.md`, `finpilot-ci.md` |
-| Raptor section (step 6) | `finpilot-onboarding.md`, `finpilot-maintain.md` |
-| Signing (optional) | `finpilot-templates.md` |
-| Rechunking (optional) | `finpilot-ci.md` |
+| Rename (step 1) | `finpilot-templates`, `finpilot-onboarding` |
+| Enable Actions (step 2) | `finpilot-onboarding` |
+| Branches and pull[bot] (step 3) | `finpilot-onboarding`, `finpilot-ci` |
+| Renovate + branch protection (step 5) | `finpilot-onboarding`, `finpilot-ci` |
+| Raptor section (step 6) | `finpilot-onboarding`, `finpilot-maintain` |
+| Signing (optional) | `finpilot-templates` |
 
-**Cross-link requirement**: Whenever you add or remove a package, app, or service **after** initial setup, update the README raptor section and its `*Last updated*` date. This is required per `.agents/skills/finpilot-maintain.md`.
+**Cross-link requirement**: Whenever you add or remove a package, app, or service **after** initial setup, update the README raptor section and its `*Last updated*` date. This is required per `finpilot-maintain`.

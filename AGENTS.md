@@ -2,33 +2,13 @@
 
 ## Start here
 
-Read the repo skill docs before changing behavior:
-
-- `.agents/skills/finpilot-overview.md` — architecture, repo layout, task router
-- `.agents/skills/finpilot-onboarding.md` — fork bootstrap: rename, Actions, token, first build
-- `.agents/skills/finpilot-packages.md` — decision tree (dnf5 vs Brew vs Flatpak)
-- `.agents/skills/finpilot-custom.md` — Brewfiles, Flatpaks, ujust rules
-- `.agents/skills/finpilot-build.md` — Containerfile, Justfile, build scripts
-- `.agents/skills/finpilot-ci.md` — GitHub Actions workflows, composite actions, Renovate
-- `.agents/skills/finpilot-maintain.md` — ongoing: Renovate PRs, signing, local test loop
-- `.agents/skills/finpilot-troubleshooting.md` — symptom → cause → fix
-- `.agents/skills/finpilot-pr-checklist.md` — PR gates by change type
-- `.agents/skills/finpilot-examples.md` — runnable examples and activation patterns
-
-### Task Router
-
-| I need to…                                     | Load                                      |
-| ---------------------------------------------- | ----------------------------------------- |
-| Bootstrap a new fork                           | `finpilot-onboarding.md`                  |
-| Add/remove a package                           | `finpilot-packages.md`                    |
-| Change Brewfiles, Flatpaks, or ujust           | `finpilot-custom.md`                      |
-| Change Containerfile, Justfile, or build/\*.sh | `finpilot-build.md`                       |
-| Fix CI or Renovate                             | `finpilot-ci.md` / `finpilot-maintain.md` |
-| Open a PR                                      | `finpilot-pr-checklist.md`                |
-| Debug a build or deploy failure                | `finpilot-troubleshooting.md`             |
-| Follow a worked example                        | `finpilot-examples.md`                    |
-| Initialize/ rename this template               | `finpilot-templates.md`                   |
-| Orient to repo architecture                    | `finpilot-overview.md`                    |
+Task-specific instructions are Agent Skills under
+`.agents/skills/<skill-name>/SKILL.md`. Agents discover them automatically from
+their descriptions. Use the matching skill before changing behavior; for an
+unfamiliar multi-phase task, start with `finpilot-overview`, continue with the
+domain skill, and finish with `finpilot-pr-checklist`. Not sure which skill
+fits? Load `finpilot-router` — it owns the routing table. The skill index with
+links lives in `.agents/skills/README.md`.
 
 ## Branch Strategy
 
@@ -135,6 +115,6 @@ Assisted-by: [Model Name] via [Tool Name]
 
 ---
 
-**Last Updated**: 2026-08-04
+**Last Updated**: 2026-08-06
 **Template Version**: finpilot (Agent UX Overhaul)
 **Maintainer**: Universal Blue Community
