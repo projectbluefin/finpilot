@@ -16,7 +16,6 @@ source /ctx/build/copr-helpers.sh
 # Enable nullglob for all glob operations to prevent failures on empty matches
 shopt -s nullglob
 
-
 echo "::group:: Overlay Brew Integration Files"
 
 # Brew integration files from @ublue-os/brew OCI (tarball, systemd services, shell integration)
