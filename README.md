@@ -49,10 +49,12 @@ Use this prompt first to get your fork building:
 Bootstrap a new custom OS from @projectbluefin/finpilot. Name it after this repository. Use the `finpilot-onboarding` skill first, then:
 1. Rename `finpilot` in the 7 required files
 2. Enable GitHub Actions and set RENOVATE_TOKEN (repo + workflow scopes)
-3. Configure branch protection for `main` with `validate` as a required status check
-4. Enable auto-merge
-5. Trigger the first green build on `main`
-6. Add the "What Makes this Raptor Different" section to README.md (with placeholders)
+3. Create the `stable` branch from `main`
+4. Replace `OWNER` in `.github/pull.yml` and install the pull GitHub App
+5. Protect `main` (with `validate` required) and `stable`
+6. Enable auto-merge
+7. Trigger the first green build on `main`
+8. Add the "What Makes this Raptor Different" section to README.md (with placeholders)
 ```
 
 ### Phase 2 — Customize
@@ -68,6 +70,7 @@ Use the `finpilot-packages` and `finpilot-custom` skills, then:
 5. Update the README "What Makes this Raptor Different" section with the new entries
 6. Run `just build && just build-qcow2 && just run-vm-qcow2` to verify locally
 7. Open a PR and merge once `validate` passes
+8. Test the `:stable-testing` image, then approve the pull[bot] promotion PR
 ```
 
 ### Phase 3 — Production
@@ -88,9 +91,11 @@ Use the `finpilot-maintain` and `finpilot-ci` skills, then:
 - Automated builds via GitHub Actions on every commit
 - Self-hosted Renovate for automated dependency updates
 - Automatic cleanup of old images (90+ days) to keep it tidy
-- Pull request workflow - test changes before merging to main
-  - PRs build and validate before merge
-  - `main` branch builds `:stable` images
+- Two-branch delivery with pull[bot] promotion (bluefin-lts pattern)
+  - Pull requests target `main` and build/validate before merge
+  - `main` publishes candidate images as `:stable-testing`
+  - pull[bot] opens promotion PRs from `main` to `stable`
+  - `stable` publishes production images as `:stable`
 - Validates your files on pull requests so you never break a build:
   - Brewfile, Justfile, ShellCheck, Renovate config, and it'll even check to make sure the flatpak you add exists on FlatHub
 - Production Grade Features
@@ -146,11 +151,34 @@ Important: Change `finpilot` to your repository name in these 7 files:
 - Go to the "Actions" tab in your repository
 - Click "I understand my workflows, go ahead and enable them"
 
-Your first build will start automatically!
+Your first testing build will start automatically and publish `:stable-testing`.
 
 Note: Image signing is disabled by default. Your images will build successfully without any signing keys. Once you're ready for production, see "Optional: Enable Image Signing" below.
 
-### 4. Enable Renovate (Required)
+### 4. Configure Testing and Stable Branches
+
+This template uses a **two-branch model**: `main` publishes `:stable-testing`
+candidate images and `stable` publishes `:stable` production images. pull[bot]
+promotes tested commits from `main` to `stable`.
+
+Create the production branch from `main`:
+
+```bash
+git switch main
+git switch -c stable
+git push --set-upstream origin stable
+git switch main
+```
+
+Replace both `OWNER` placeholders in `.github/pull.yml` with your GitHub
+username, then install the [pull GitHub App](https://github.com/apps/pull) for
+your repository. pull[bot] opens promotion PRs from `main` to `stable` — never
+push directly to `stable`.
+
+See the [setup checklist](.github/SETUP_CHECKLIST.md) for branch protection
+details and config validation.
+
+### 5. Enable Renovate (Required)
 
 Renovate automatically updates dependencies and GitHub Actions (including workflow files). This template uses a self-hosted Renovate runner via `projectbluefin/actions`.
 
@@ -174,7 +202,7 @@ Renovate automatically updates dependencies and GitHub Actions (including workfl
 
 Renovate will run every 6 hours and on config changes. It pins GitHub Actions to SHAs and updates tracked image digests automatically.
 
-### 5. Customize Your Image
+### 6. Customize Your Image
 
 Choose your base image in `Containerfile` (the `FROM` line):
 
@@ -197,21 +225,41 @@ Customize your apps:
 - Add Flatpaks in `custom/flatpaks/` ([guide](custom/flatpaks/README.md))
 - Add ujust commands in `custom/ujust/` ([guide](custom/ujust/README.md))
 
-### 6. Development Workflow
+### 7. Development Workflow
 
-All changes should be made via pull requests:
+| Branch   | Image tag         | Purpose                      |
+| -------- | ----------------- | ---------------------------- |
+| `main`   | `:stable-testing` | Integration and user testing |
+| `stable` | `:stable`         | Approved production releases |
 
-1. Open a pull request on GitHub with the change you want.
-2. The PR will automatically trigger:
-   - Build validation
-   - Brewfile, Flatpak, Justfile, and shellcheck validation
-   - Test image build
-3. Once checks pass, merge the PR
-4. Merging triggers publishes a `:stable` image
+All feature and Renovate pull requests target `main`:
 
-### 7. Deploy Your Image
+1. Create a feature branch and open a pull request to `main`.
+2. Wait for build, Brewfile, Flatpak, Justfile, and shell validation.
+3. Merge the pull request to publish `:stable-testing`.
+4. Test the candidate image:
 
-Switch to your image:
+   ```bash
+   sudo bootc switch ghcr.io/your-username/your-repo-name:stable-testing
+   sudo systemctl reboot
+   ```
+
+5. Review the promotion PR that pull[bot] opens from `main` to `stable`.
+6. Approve and merge it to publish `:stable`.
+
+Never push directly to `stable`; pull[bot] manages it with a `hardreset`
+promotion strategy.
+
+### 8. Deploy Your Image
+
+Test the current candidate from `main`:
+
+```bash
+sudo bootc switch ghcr.io/your-username/your-repo-name:stable-testing
+sudo systemctl reboot
+```
+
+Deploy the promoted production image from `stable`:
 
 ```bash
 sudo bootc switch ghcr.io/your-username/your-repo-name:stable
@@ -254,6 +302,12 @@ cosign verify \
 Ready to take your custom OS to production? Enable these features for enhanced security, reliability, and performance:
 
 ### Production Checklist
+
+- [ ] **Configure Testing-to-Stable Promotion**
+  - Create `stable` from `main`
+  - Replace `OWNER` in `.github/pull.yml`
+  - Install the [pull GitHub App](https://github.com/apps/pull)
+  - Protect `stable` from direct pushes
 
 - [ ] **Enable Image Signing** (Recommended)
   - Provides cryptographic verification of your images
