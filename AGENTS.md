@@ -59,12 +59,23 @@ links lives in `.agents/skills/README.md`.
 4. **ALWAYS** use `dnf5` exclusively (never `dnf`, `yum`, `rpm-ostree`)
 5. **ALWAYS** use `-y` flag for non-interactive installs
 6. **NEVER** use `dnf5` in ujust files — only Brewfile/Flatpak shortcuts
-7. **NEVER** push directly to `main` (only via PR with passing `validate` check)
+7. **NEVER** push directly to `main` (only via PR with passing `validate` check); use pull[bot] to promote tested changes from `main` → `stable`
 8. **ALWAYS** confirm with user before deviating from @ublue-os/bluefin patterns
 9. **ALWAYS** run shellcheck/YAML validation before committing
 10. **ALWAYS** follow numbered script convention: `10-*.sh`, `20-*.sh`, `30-*.sh`
 11. **ALWAYS** validate that new Flatpak IDs exist on Flathub before adding
 12. **NEVER** modify validation workflows without understanding impact on PR checks
+
+## Branch Strategy
+
+| Branch | Purpose | Image Tag | Trigger |
+|--------|---------|-----------|--------|
+| `main` | Testing — PRs land here, CI validates changes | `:stable-testing` | Push to `main`, PRs to `main` |
+| `stable` | Production — promoted via pull[bot] | `:stable` | Push to `stable` (via pull[bot]) |
+
+**Promotion flow:** PR merges to `main` → `:stable-testing` image built → pull[bot] auto-creates PR `main` → `stable` → approved → `:stable` production image built.
+
+**pull[bot] configuration:** See `.github/pull.yml`. Replace `OWNER` placeholder with your GitHub username after installing the [pull](https://github.com/apps/pull) GitHub App.
 
 ## Analysis vs Implementation
 
