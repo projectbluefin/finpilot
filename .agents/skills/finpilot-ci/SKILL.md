@@ -33,7 +33,7 @@ description: >-
 
 | File                     | Trigger                           | Purpose                                              |
 | ------------------------ | --------------------------------- | ---------------------------------------------------- |
-| `build-image.yml`        | push main, schedule, manual       | Build + push `:stable` via `projectbluefin/actions`  |
+| `build-image.yml`        | PR/push main + stable, merge group, manual | PR builds; publishes `:stable-testing` (main) or `:stable` (stable) |
 | `pr-validation.yml`      | PR → main                         | shellcheck + hadolint + pre-commit via `validate-pr` |
 | `renovate.yml`           | schedule 6h, push renovate config | Self-hosted Renovate runner                          |
 | `clean.yml`              | schedule weekly                   | Delete GHCR images older than 90 days                |
@@ -41,6 +41,14 @@ description: >-
 | `validate-flatpaks.yml`  | PR paths: `custom/flatpaks/**`    | Flathub app ID existence check                       |
 | `validate-justfiles.yml` | PR paths: `Justfile`              | `just --list` syntax check                           |
 | `validate-renovate.yml`  | PR paths: `.github/renovate.json` | `renovate-config-validator`                          |
+
+## Branch Promotion and Tags
+
+- `main` is the **testing branch** and publishes `:stable-testing`.
+- `stable` is the **production branch** and publishes `:stable`.
+- `.github/pull.yml` configures pull[bot] to promote `main` to `stable` (hardreset, blocked while CI fails).
+- The `Determine image tag` step sets `TAG_STREAM=testing` off the production branch; the `Finalize branch tags` step renames `testing*` tags to `stable-testing-*` so they can never collide with production `stable-daily*` aliases.
+- Never add branch-specific changes directly to `stable`; its history is hard-reset from `main` during promotion.
 
 ## Composite Action Pins
 

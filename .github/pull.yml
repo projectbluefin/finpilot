@@ -1,0 +1,22 @@
+# pull[bot] (https://github.com/apps/pull) promotes tested commits from the
+# testing branch (`main`) to the production branch (`stable`), mirroring the
+# ublue-os/bluefin-lts two-branch model.
+#
+# Template setup:
+#   1. Create the `stable` branch as a copy of `main`.
+#   2. Replace `OWNER` below with your GitHub username (reviewers and
+#      conflictReviewers).
+#   3. Install the pull GitHub App for your repository and validate the config
+#      at https://pull.git.ci/check/YOUR_USERNAME/YOUR_REPO
+version: "1"
+rules:
+  - base: stable
+    upstream: main
+    mergeMethod: hardreset
+    mergeUnstable: false
+    reviewers:
+      - OWNER
+    conflictReviewers:
+      - OWNER
+label: "promotion"
+conflictLabel: "promotion-conflict"
