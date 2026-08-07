@@ -88,9 +88,12 @@ Use the `finpilot-maintain` and `finpilot-ci` skills, then:
 - Automated builds via GitHub Actions on every commit
 - Self-hosted Renovate for automated dependency updates
 - Automatic cleanup of old images (90+ days) to keep it tidy
+- **Two-branch workflow**: `main` builds `:stable-testing`, pull[bot] promotes to `stable` which builds `:stable`
+- **pull[bot] promotion**: Automatically creates PRs from `main` → `stable` using hardreset; skip if CI is failing
 - Pull request workflow - test changes before merging to main
   - PRs build and validate before merge
-  - `main` branch builds `:stable` images
+  - `main` branch builds `:stable-testing` images
+  - `stable` branch builds `:stable` production images
 - Validates your files on pull requests so you never break a build:
   - Brewfile, Justfile, ShellCheck, Renovate config, and it'll even check to make sure the flatpak you add exists on FlatHub
 - Production Grade Features
@@ -199,22 +202,50 @@ Customize your apps:
 
 ### 6. Development Workflow
 
-All changes should be made via pull requests:
+All changes should be made via pull requests targeting `main`:
 
-1. Open a pull request on GitHub with the change you want.
-2. The PR will automatically trigger:
-   - Build validation
-   - Brewfile, Flatpak, Justfile, and shellcheck validation
-   - Test image build
+| Branch | Purpose | Image Tag |
+|--------|---------|----------|
+| `main` | Testing — PRs land here | `:stable-testing` |
+| `stable` | Production — promoted via pull[bot] | `:stable` |
+
+**Step-by-step workflow:**
+
+1. Create a feature branch and open a PR targeting `main`
+2. PR triggers build validation, Brewfile/Flatpak/Justfile/shellcheck checks
 3. Once checks pass, merge the PR
-4. Merging triggers publishes a `:stable` image
+4. Merging triggers a `:stable-testing` image build on `main`
+5. When you're ready for production, pull[bot] auto-creates a PR from `main` → `stable`
+6. Review and approve the promotion PR
+7. Approved promotion triggers a `:stable` production image build on `stable`
+
+**Testing your image before promotion:**
+
+```bash
+# Test the latest :stable-testing image
+sudo bootc switch --transport registry ghcr.io/YOUR_USERNAME/YOUR_REPO:stable-testing
+sudo systemctl reboot
+```
+
+**After promotion to stable:**
+
+```bash
+# Deploy the production image
+sudo bootc switch --transport registry ghcr.io/YOUR_USERNAME/YOUR_REPO:stable
+sudo systemctl reboot
+```
 
 ### 7. Deploy Your Image
 
 Switch to your image:
 
 ```bash
+# Production image (from stable branch)
 sudo bootc switch ghcr.io/your-username/your-repo-name:stable
+sudo systemctl reboot
+
+# Testing image (from main branch, before promotion)
+sudo bootc switch ghcr.io/your-username/your-repo-name:stable-testing
 sudo systemctl reboot
 ```
 
