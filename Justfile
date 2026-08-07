@@ -1,4 +1,7 @@
 export IMAGE_NAME := env("IMAGE_NAME", "finpilot")
+
+# CI overrides to "stable-testing" on main branch
+
 export DEFAULT_TAG := env("DEFAULT_TAG", "stable")
 export PODMAN := env("PODMAN", "podman")
 export REPO_ORG := env("GITHUB_REPOSITORY_OWNER", "projectbluefin")
@@ -177,6 +180,7 @@ build $target_image=IMAGE_NAME $tag=DEFAULT_TAG:
         .
 
 # Tag images with the generated alias tags
+
 # Bluefin pattern: separate tagging from pushing
 [group('Image')]
 tag-images $image_name="" $default_tag="" $tags="":
