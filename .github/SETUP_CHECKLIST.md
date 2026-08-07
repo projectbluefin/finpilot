@@ -45,7 +45,36 @@ git push origin main
 
 **Agent skills:** `finpilot-onboarding` (branch protection), `finpilot-ci` (Renovate config)
 
-### 5. Add "What Makes this Raptor Different" to README
+### 5. Create Stable Branch
+
+- [ ] Create the `stable` branch from `main`:
+
+```bash
+git checkout main
+git checkout -b stable
+git push origin stable
+git checkout main
+```
+
+### 6. Install pull[bot] GitHub App (Required for Promotion)
+
+The [pull](https://github.com/apps/pull) GitHub App automatically promotes tested changes from `main` → `stable`.
+
+- [ ] Install the pull App: **Settings → Applications → Search "pull" → Install**
+- [ ] Replace `OWNER` placeholder in `.github/pull.yml` with your GitHub username:
+  ```bash
+  sed -i "s/OWNER/your-github-username/g" .github/pull.yml
+  ```
+- [ ] Commit and push:
+  ```bash
+  git add .github/pull.yml
+  git commit -m "chore: configure pull[bot] for OWNER"
+  git push origin main
+  ```
+
+**Workflow:** `main` (PRs land → `:stable-testing` image) → pull[bot] auto-creates PR → `stable` (approved → `:stable` production image)
+
+### 7. Add "What Makes this Raptor Different" to README
 
 - [ ] Open `README.md`
 - [ ] Paste the raptor section template (see README or use the `finpilot-onboarding` skill)
@@ -54,9 +83,14 @@ git push origin main
 
 **Agent skills:** `finpilot-onboarding` (raptor section), `finpilot-maintain` (maintenance requirement)
 
-### 6. Deploy
+### 8. Deploy
 
 ```bash
+# Deploy testing image (from main branch)
+sudo bootc switch --transport registry ghcr.io/YOUR_USERNAME/YOUR_REPO:stable-testing
+sudo systemctl reboot
+
+# Deploy production image (from stable branch, after pull[bot] promotion)
 sudo bootc switch --transport registry ghcr.io/YOUR_USERNAME/YOUR_REPO:stable
 sudo systemctl reboot
 ```
@@ -83,7 +117,9 @@ Which skill to load for each checklist block above:
 | Rename (step 1)                       | `finpilot-templates`, `finpilot-onboarding`     |
 | Enable Actions (step 2)               | `finpilot-onboarding`                           |
 | Renovate + branch protection (step 4) | `finpilot-onboarding`, `finpilot-ci`            |
-| Raptor section (step 5)               | `finpilot-onboarding`, `finpilot-maintain`      |
+| Stable branch (step 5)                | `finpilot-onboarding`                           |
+| pull[bot] install (step 6)            | `finpilot-ci`                                   |
+| Raptor section (step 7)               | `finpilot-onboarding`, `finpilot-maintain`      |
 | Signing (optional)                    | `finpilot-templates`                            |
 
 **Cross-link requirement**: Whenever you add or remove a package, app, or service **after** initial setup, update the README raptor section and its `*Last updated*` date. This is required by the `finpilot-maintain` skill.
