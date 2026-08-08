@@ -10,6 +10,37 @@ domain skill, and finish with `finpilot-pr-checklist`. Not sure which skill
 fits? Load `finpilot-router` — it owns the routing table. The skill index with
 links lives in `.agents/skills/README.md`.
 
+## Branch Strategy
+
+- `main` is the **testing branch** — all feature and Renovate PRs land here,
+  and pushes publish `:stable-testing` images.
+- `stable` is the **production branch** — pushes publish `:stable` images.
+- Promotion is `main` → `stable` via squash PRs opened by
+  `.github/workflows/promote-main-to-stable.yml`, a thin caller of the factory
+  reusable `projectbluefin/actions/.github/workflows/reusable-promote-squash.yml`.
+  `sync-stable-to-main.yml` (`reusable-sync-branches.yml`) merges any direct
+  `stable` hotfixes back into `main`.
+- Decision record: the factory reusable workflow was chosen over the external
+  pull[bot] app (issues #235/#237). Do not add `.github/pull.yml`.
+- Never commit directly to `stable`; it receives only promotion PRs.
+
+## Release Workflow
+
+1. Open changes against `main`.
+2. Merge only after required validation and image build checks pass.
+3. Test `ghcr.io/OWNER/IMAGE:stable-testing`.
+4. Review the auto-opened promotion PR from `main` to `stable`.
+5. Merge the promotion to publish `ghcr.io/OWNER/IMAGE:stable`.
+
+| Branch   | Image tag         | Audience                       |
+| -------- | ----------------- | ------------------------------ |
+| `main`   | `:stable-testing` | Testers and release candidates |
+| `stable` | `:stable`         | Production systems             |
+
+The promotion release gate verifies cosign signatures on the `:testing` tag;
+enable keyless signing (SETUP_CHECKLIST "Enable Signing") for it to report
+`release/ready`.
+
 ## CRITICAL: GitHub API Usage
 
 **ALWAYS use GitHub API for external references:**
@@ -60,11 +91,13 @@ links lives in `.agents/skills/README.md`.
 5. **ALWAYS** use `-y` flag for non-interactive installs
 6. **NEVER** use `dnf5` in ujust files — only Brewfile/Flatpak shortcuts
 7. **NEVER** push directly to `main` (only via PR with passing `validate` check)
-8. **ALWAYS** confirm with user before deviating from @ublue-os/bluefin patterns
-9. **ALWAYS** run shellcheck/YAML validation before committing
-10. **ALWAYS** follow numbered script convention: `10-*.sh`, `20-*.sh`, `30-*.sh`
-11. **ALWAYS** validate that new Flatpak IDs exist on Flathub before adding
-12. **NEVER** modify validation workflows without understanding impact on PR checks
+8. **NEVER** push directly to `stable`; promote tested `main` commits via the promotion PR from `promote-main-to-stable.yml`
+9. **ALWAYS** test the `:stable-testing` image before merging a promotion to `stable`
+10. **ALWAYS** confirm with user before deviating from @ublue-os/bluefin patterns
+11. **ALWAYS** run shellcheck/YAML validation before committing
+12. **ALWAYS** follow numbered script convention: `10-*.sh`, `20-*.sh`, `30-*.sh`
+13. **ALWAYS** validate that new Flatpak IDs exist on Flathub before adding
+14. **NEVER** modify validation workflows without understanding impact on PR checks
 
 ## Analysis vs Implementation
 

@@ -20,7 +20,28 @@
 - [ ] Settings → Actions → General → Enable workflows
 - [ ] Set "Read and write permissions"
 
-### 3. First Push
+### 3. Configure Testing and Production Branches
+
+This template uses a **two-branch model**: `main` publishes `:stable-testing`
+candidate images, and `stable` publishes `:stable` production images.
+Promotion is a squash PR from `main` to `stable` opened automatically by
+`.github/workflows/promote-main-to-stable.yml` (factory reusable workflow —
+no external GitHub App required).
+
+Create `stable` as an exact copy of `main`, then return to `main`:
+
+```bash
+git switch main
+git switch -c stable
+git push --set-upstream origin stable
+git switch main
+```
+
+- [ ] Never commit directly to `stable`; it receives only promotion PRs
+- [ ] Enable keyless signing (see "Enable Signing" below) so the promotion
+      release gate can verify image signatures and report `release/ready`
+
+### 4. First Push
 
 ```bash
 git add .
@@ -28,7 +49,7 @@ git commit -m "feat: initial customization"
 git push origin main
 ```
 
-### 4. Enable Renovate (Required)
+### 5. Enable Renovate (Required)
 
 - [ ] Create a **Classic PAT** (Settings → Developer settings → Personal access tokens → Tokens (classic))
   - Scopes: `repo` (full control) + `workflow` (update workflows)
@@ -41,11 +62,15 @@ git push origin main
   - Enable "Require status checks to pass before merging"
   - Add `validate` as a required status check
   - Enable "Require branches to be up to date before merging"
+- [ ] Configure branch protection for `stable`: require a pull request before
+      merging so only promotion PRs land there
 - [ ] Renovate will create a PR to pin your GitHub Actions to SHAs
+
+Renovate targets `main`; approved changes reach `stable` through the promotion flow.
 
 **Agent skills:** `finpilot-onboarding` (branch protection), `finpilot-ci` (Renovate config)
 
-### 5. Add "What Makes this Raptor Different" to README
+### 6. Add "What Makes this Raptor Different" to README
 
 - [ ] Open `README.md`
 - [ ] Paste the raptor section template (see README or use the `finpilot-onboarding` skill)
@@ -54,7 +79,16 @@ git push origin main
 
 **Agent skills:** `finpilot-onboarding` (raptor section), `finpilot-maintain` (maintenance requirement)
 
-### 6. Deploy
+### 7. Deploy
+
+Test the candidate image from `main`:
+
+```bash
+sudo bootc switch --transport registry ghcr.io/YOUR_USERNAME/YOUR_REPO:stable-testing
+sudo systemctl reboot
+```
+
+After merging the promotion to `stable`, deploy the production image:
 
 ```bash
 sudo bootc switch --transport registry ghcr.io/YOUR_USERNAME/YOUR_REPO:stable
@@ -93,8 +127,9 @@ Which skill to load for each checklist block above:
 | ------------------------------------- | ------------------------------------------- |
 | Rename (step 1)                       | `finpilot-templates`, `finpilot-onboarding` |
 | Enable Actions (step 2)               | `finpilot-onboarding`                       |
-| Renovate + branch protection (step 4) | `finpilot-onboarding`, `finpilot-ci`        |
-| Raptor section (step 5)               | `finpilot-onboarding`, `finpilot-maintain`  |
+| Branches + promotion (step 3)         | `finpilot-onboarding`, `finpilot-ci`        |
+| Renovate + branch protection (step 5) | `finpilot-onboarding`, `finpilot-ci`        |
+| Raptor section (step 6)               | `finpilot-onboarding`, `finpilot-maintain`  |
 | Signing (optional)                    | `finpilot-templates`                        |
 | Rechunking (optional)                 | `finpilot-ci`                               |
 
