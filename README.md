@@ -174,7 +174,27 @@ Renovate automatically updates dependencies and GitHub Actions (including workfl
 
 Renovate will run every 6 hours and on config changes. It pins GitHub Actions to SHAs and updates tracked image digests automatically.
 
-### 5. Customize Your Image
+### 5. Maintain Your Template
+
+Repositories created with **Use this template** are independent repositories.
+Renovate keeps pinned dependencies current, but it does not copy arbitrary
+changes from finpilot's `Containerfile`, build scripts, or workflows.
+
+For a template improvement or build-system change, file a scoped
+[finpilot issue](https://github.com/projectbluefin/finpilot/issues/new/choose)
+instead of merging unrelated histories:
+
+- Select **"Opt in to a clanker working on my issue"** when creating your own
+  issue to send it directly to `3-clanker-queue`.
+- Maintainers can move any accepted issue to `3-clanker-queue`.
+- A Hive-connected agent opens a focused pull request; humans review and merge
+  it.
+
+Review and port structural changes into your custom image deliberately through
+a pull request. This preserves your image-specific changes while sharing
+improvements with every future finpilot user.
+
+### 6. Customize Your Image
 
 Choose your base image in `Containerfile` (the `FROM` line):
 
@@ -197,7 +217,7 @@ Customize your apps:
 - Add Flatpaks in `custom/flatpaks/` ([guide](custom/flatpaks/README.md))
 - Add ujust commands in `custom/ujust/` ([guide](custom/ujust/README.md))
 
-### 6. Development Workflow
+### 7. Development Workflow
 
 All changes should be made via pull requests:
 
@@ -209,7 +229,7 @@ All changes should be made via pull requests:
 3. Once checks pass, merge the PR
 4. Merging triggers publishes a `:stable` image
 
-### 7. Deploy Your Image
+### 8. Deploy Your Image
 
 Switch to your image:
 

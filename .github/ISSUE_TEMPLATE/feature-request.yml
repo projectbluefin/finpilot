@@ -1,0 +1,43 @@
+name: "Feature request"
+description: "Propose something new. Specific proposals ship. Vague ones wait."
+labels: ["1-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The bottleneck is almost never implementation — it is clarity. Contributors can ship well-scoped work fast, but only if the finish line is clear.
+
+  - type: checkboxes
+    id: clanker-opt-in
+    attributes:
+      label: "Agent assistance"
+      options:
+        - label: "Opt in to a clanker working on my issue"
+          required: false
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: "What would you like to see?"
+      description: "What is missing, broken, or annoying? Be specific — name the command, the file, the workflow step."
+      placeholder: "Add this feature or ask for a design review"
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: "What does done look like?"
+      description: "What command do you run? What do you see? What file changes?"
+      placeholder: "I should be able to set up Docker in one command"
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: "Extra context"
+      description: "Optional — related issues, upstream references, or files you think are affected."
+      placeholder: "related issues, upstream references, or files you think are affected"
+    validations:
+      required: false

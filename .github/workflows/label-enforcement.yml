@@ -1,0 +1,17 @@
+name: enforce workflow labels
+
+on:
+  issues:
+    types: [opened, edited, labeled, unlabeled]
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  enforce:
+    uses: projectbluefin/actions/.github/workflows/reusable-design-enforcement.yml@ce7ab75eb66d3ace300fed4c121a31b417e8f9fe
+    secrets: inherit

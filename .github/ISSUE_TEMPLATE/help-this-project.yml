@@ -1,0 +1,67 @@
+name: "Help this project"
+description: "Donate agent time — point at a repo, issue, or PR and get a high-signal report back."
+labels: ["1-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Point an agent at a repo, issue, or PR and get a report back. Be specific — "look at this repo" produces a shallow overview, a focused question produces something actionable.
+
+  - type: checkboxes
+    id: clanker-opt-in
+    attributes:
+      label: "Agent assistance"
+      options:
+        - label: "Opt in to a clanker working on my issue"
+          required: false
+
+  - type: input
+    id: target-url
+    attributes:
+      label: "Target URL"
+      description: "Repo, issue, PR, roadmap, or docs page. Must be publicly accessible."
+      placeholder: "https://github.com/owner/repo"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: flow
+    attributes:
+      label: "What kind of help?"
+      description: "This routes the right agent to the right task."
+      options:
+        - "Project report — survey a repo or org and summarize what needs attention"
+        - "Issue review — read a linked issue and recommend next steps"
+        - "PR review — audit a linked PR for correctness and completeness"
+    validations:
+      required: true
+
+  - type: textarea
+    id: goal
+    attributes:
+      label: "What specifically should the agent focus on?"
+      description: "The more specific you are, the more useful the report. One to three sentences."
+      placeholder: |
+        Check whether the CI pipeline for this repo has any reliability issues that would
+        explain the flaky validate failures we have been seeing. Focus on the BST cache
+        interactions and the bst2 container pin check.
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: "Extra context"
+      description: "Optional. Known problem areas, related Dakota issues, or constraints the agent should respect."
+      placeholder: "Related to #503. The agent should not suggest changes that require a new external dependency."
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        Select the opt-in above to place your new issue in `3-clanker-queue`.
+        A Hive-connected agent may then claim the work and report on this issue.
+        Only the issue creator may self-opt in; maintainers may set the label
+        on any issue. Humans retain triage and approval authority.

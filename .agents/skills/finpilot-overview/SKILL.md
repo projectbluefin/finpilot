@@ -79,6 +79,10 @@ pipeline repo itself, but it adopts the same composite workflow actions as bluef
 - CI uses `projectbluefin/actions/bootc-build/*` composite actions
 - Renovate config extends `config:best-practices` and tracks OCI digests
 - Image metadata (`image-info.json`) follows the ublue-os convention
+- The label-enforcement workflow maintains the shared seven-label lifecycle;
+  an issue creator's form opt-in admits their new issue to
+  `3-clanker-queue` for Hive-connected agents; maintainers may also set that
+  label explicitly
 
 ## Task Router
 

@@ -39,6 +39,7 @@ description: >-
 | Follow a worked example                        | `finpilot-examples`                    |
 | Initialize/ rename this template               | `finpilot-templates`                   |
 | Orient to repo architecture                    | `finpilot-overview`                    |
+| Capture a durable lesson                       | `skill-improvement`                    |
 | Pick a skill for a new task                    | `finpilot-router` (this skill)         |
 
 ## Common Rationalizations

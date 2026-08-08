@@ -80,6 +80,31 @@ Assisted-by: [Model Name] via [Tool Name]
 
 ---
 
+## Factory workflow and ownership
+
+Use the shared lifecycle and labels in
+[`projectbluefin/common/docs/skills/label-workflow.md`](https://github.com/projectbluefin/common/blob/main/docs/skills/label-workflow.md).
+Humans triage and approve; agents work only on assigned or
+`3-clanker-queue` issues. Clankers is authenticated Hive transport only, not
+merge authority. Keep template-specific ownership local and never write to
+`ublue-os/*`.
+
+## Self-Improvement
+
+Every session: ship the work and update the relevant skill file in
+`.agents/skills/`. Same PR, not a follow-up.
+
+Banned:
+- No changelog files. Delete `IMPROVEMENTS.md`, `CHANGELOG.md`, and
+  `SESSION.md` if found.
+- No session notes committed to the repository.
+- No "append here" documentation. Route durable learning to `.agents/skills/`.
+
+Before marking work done:
+- [ ] Discovered a workaround, pattern, or convention?
+- [ ] Updated or created the relevant skill file?
+- [ ] Included that learning in this PR?
+
 **Last Updated**: 2026-08-05
 **Template Version**: finpilot (Agent UX Overhaul)
 **Maintainer**: Universal Blue Community

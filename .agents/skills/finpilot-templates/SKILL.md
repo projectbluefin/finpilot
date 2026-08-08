@@ -4,6 +4,9 @@ description: >-
   Template identity rules: the seven rename locations, image identity ARGs,
   keyless signing setup, and AGENTS.md update rules. Use when renaming a fork,
   enabling signing, or updating AGENTS.md and setup docs.
+metadata:
+  context7-sources:
+    - /renovatebot/renovate
 ---
 
 # finpilot Templates & Fork Setup
@@ -29,6 +32,29 @@ description: >-
 3. **Enable keyless signing** when the fork is production-ready (below)
 4. **Update AGENTS.md** per the rules below
 5. **Verify** against the checklist at the end of this skill
+
+## Maintaining a Template-Derived Image
+
+`Use this template` creates an independent repository. Renovate updates
+tracked dependencies, action pins, and OCI digests, but it does not synchronize
+arbitrary template structure or build logic.
+
+For an improvement that should benefit finpilot users:
+
+1. File a scoped issue in `projectbluefin/finpilot`.
+2. The issue creator may select the Clanker opt-in to place their new issue in
+   `3-clanker-queue`; maintainers may apply that label to any accepted issue.
+3. A Hive-connected agent works the queued issue in a focused pull request.
+4. Humans review and merge the pull request.
+
+Do not merge a template repository into a derivative with unrelated histories.
+Review `Containerfile`, build script, and workflow changes, then port the
+needed changes deliberately through a pull request that preserves the
+derivative's customizations.
+
+## Sources
+
+- Renovate dependency-update behavior: `/renovatebot/renovate`
 
 ## The Seven Rename Locations
 

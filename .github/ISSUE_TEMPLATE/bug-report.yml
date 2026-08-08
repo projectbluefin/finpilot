@@ -1,0 +1,45 @@
+name: "Bug report"
+description: "Something is broken. You are the only person who can confirm it."
+labels: ["1-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Run `ujust report` before submitting. It captures your image, kernel, hardware, and logs — paste the gist URL below and we likely have everything we need.
+
+  - type: checkboxes
+    id: clanker-opt-in
+    attributes:
+      label: "Agent assistance"
+      options:
+        - label: "Opt in to a clanker working on my issue"
+          required: false
+
+  - type: input
+    id: report-link
+    attributes:
+      label: "ujust report gist URL"
+      placeholder: "https://gist.github.com/..."
+    validations:
+      required: false
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: "What happened?"
+      description: "What did you see? What did you expect? Be specific — hardware model, exact error text, what you were doing."
+      placeholder: |
+        Bluetooth disappears from the panel after suspend on my Framework 13 AMD.
+        The indicator is gone until I reboot. journalctl shows "hci0: Bluetooth host wakeup failed".
+        Expected it to reconnect automatically, as it does on Fedora 42.
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: "Extra context"
+      description: "Optional — upstream bug links, 'works on X but not Y', anything that narrows the cause."
+      placeholder: "Works fine on the Intel NUC in the same setup. Appears on both 6.14 and 6.15 kernels."
+    validations:
+      required: false
