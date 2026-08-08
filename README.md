@@ -88,15 +88,15 @@ Use the `finpilot-maintain` and `finpilot-ci` skills, then:
 - Automated builds via GitHub Actions on every commit
 - Self-hosted Renovate for automated dependency updates
 - Automatic cleanup of old images (90+ days) to keep it tidy
-- Pull request workflow - test changes before merging to main
-  - PRs build and validate before merge
-  - `main` branch builds `:stable` images
+- Two-branch testing & production pipeline with pull[bot] promotion:
+  - `main` branch builds `:stable-testing` images for verification
+  - [pull[bot]](https://github.com/apps/pull) automatically creates promotion PRs from `main` → `stable`
+  - Merging to `stable` builds production `:stable` images
 - Validates your files on pull requests so you never break a build:
   - Brewfile, Justfile, ShellCheck, Renovate config, and it'll even check to make sure the flatpak you add exists on FlatHub
 - Production Grade Features
   - Container signing with keyless OIDC
   - See checklist below to enable these as they take some manual configuration
-
 ### Homebrew Integration
 
 - Pre-configured Brewfiles for easy package installation and customization
@@ -199,25 +199,37 @@ Customize your apps:
 
 ### 6. Development Workflow
 
-All changes should be made via pull requests:
+All changes follow an 8-step dual-branch workflow:
 
-1. Open a pull request on GitHub with the change you want.
-2. The PR will automatically trigger:
-   - Build validation
-   - Brewfile, Flatpak, Justfile, and shellcheck validation
-   - Test image build
-3. Once checks pass, merge the PR
-4. Merging triggers publishes a `:stable` image
+|   Branch |         Image Tag |                                                        Purpose |
+|---------:|------------------:|---------------------------------------------------------------:|
+|   `main` | `:stable-testing` | Testing branch where PRs land and testing images are published |
+| `stable` |         `:stable` |      Production branch that builds production `:stable` images |
+
+1. Create a feature branch and open a PR targeting `main`.
+2. PR triggers `validate` status checks.
+3. Merge PR into `main` after checks pass.
+4. `main` push triggers build and publishes `:stable-testing` image.
+5. [pull[bot]](https://github.com/apps/pull) automatically creates a promotion PR from `main` → `stable`.
+6. Test `:stable-testing` on your local system (`sudo bootc switch ...:stable-testing`).
+7. Review and merge pull[bot]'s promotion PR into `stable`.
+8. `stable` push builds and publishes production `:stable` image.
 
 ### 7. Deploy Your Image
 
-Switch to your image:
+Deploy testing image (`main` branch):
+
+```bash
+sudo bootc switch ghcr.io/your-username/your-repo-name:stable-testing
+sudo systemctl reboot
+```
+
+Deploy production image (`stable` branch):
 
 ```bash
 sudo bootc switch ghcr.io/your-username/your-repo-name:stable
 sudo systemctl reboot
 ```
-
 ## Optional: Enable Image Signing
 
 Image signing is disabled by default to let you start building immediately. However, signing is strongly recommended for production use.

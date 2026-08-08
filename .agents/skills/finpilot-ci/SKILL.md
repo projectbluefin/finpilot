@@ -31,16 +31,16 @@ description: >-
 
 ## Workflow Map
 
-| File                     | Trigger                           | Purpose                                              |
-| ------------------------ | --------------------------------- | ---------------------------------------------------- |
-| `build-image.yml`        | push main, schedule, manual       | Build + push `:stable` via `projectbluefin/actions`  |
-| `pr-validation.yml`      | PR → main                         | shellcheck + hadolint + pre-commit via `validate-pr` |
-| `renovate.yml`           | schedule 6h, push renovate config | Self-hosted Renovate runner                          |
-| `clean.yml`              | schedule weekly                   | Delete GHCR images older than 90 days                |
-| `validate-brewfiles.yml` | PR paths: `custom/brew/**`        | Homebrew Brewfile syntax check                       |
-| `validate-flatpaks.yml`  | PR paths: `custom/flatpaks/**`    | Flathub app ID existence check                       |
-| `validate-justfiles.yml` | PR paths: `Justfile`              | `just --list` syntax check                           |
-| `validate-renovate.yml`  | PR paths: `.github/renovate.json` | `renovate-config-validator`                          |
+|                     File |                           Trigger |                                                        Purpose |
+|-------------------------:|----------------------------------:|---------------------------------------------------------------:|
+|        `build-image.yml` |          push main/stable, manual | Build + push branch-specific tags via `projectbluefin/actions` |
+|      `pr-validation.yml` |                         PR → main |           shellcheck + hadolint + pre-commit via `validate-pr` |
+|           `renovate.yml` | schedule 6h, push renovate config |                                    Self-hosted Renovate runner |
+|              `clean.yml` |                   schedule weekly |                          Delete GHCR images older than 90 days |
+| `validate-brewfiles.yml` |        PR paths: `custom/brew/**` |                                 Homebrew Brewfile syntax check |
+|  `validate-flatpaks.yml` |    PR paths: `custom/flatpaks/**` |                                 Flathub app ID existence check |
+| `validate-justfiles.yml` |              PR paths: `Justfile` |                                     `just --list` syntax check |
+|  `validate-renovate.yml` | PR paths: `.github/renovate.json` |                                    `renovate-config-validator` |
 
 ## Composite Action Pins
 
