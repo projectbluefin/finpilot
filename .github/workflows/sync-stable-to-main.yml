@@ -1,0 +1,32 @@
+---
+name: Sync stable to main
+
+# After each squash-merge promotion (main → stable), the squash commit exists
+# only on stable. Since the trees are identical this workflow normally no-ops;
+# if a hotfix ever lands on stable directly, it is merged back into main so
+# the next promotion PR is not blocked.
+#
+# Thin caller for the factory reusable in projectbluefin/actions, matching
+# bluefin's sync-main-to-testing.yml.
+
+on:
+  push:
+    branches:
+      - stable
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-stable-to-main
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Keep main up-to-date with stable
+    uses: projectbluefin/actions/.github/workflows/reusable-sync-branches.yml@f8418f73faf163c048ab23f10655235c078d7606 # v1
+    permissions:
+      contents: write
+    with:
+      source_branch: stable
+      target_branch: main
