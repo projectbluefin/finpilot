@@ -31,16 +31,32 @@ description: >-
 
 ## Workflow Map
 
-| File                     | Trigger                           | Purpose                                              |
-| ------------------------ | --------------------------------- | ---------------------------------------------------- |
-| `build-image.yml`        | push main, schedule, manual       | Build + push `:stable` via `projectbluefin/actions`  |
-| `pr-validation.yml`      | PR → main                         | shellcheck + hadolint + pre-commit via `validate-pr` |
-| `renovate.yml`           | schedule 6h, push renovate config | Self-hosted Renovate runner                          |
-| `clean.yml`              | schedule weekly                   | Delete GHCR images older than 90 days                |
-| `validate-brewfiles.yml` | PR paths: `custom/brew/**`        | Homebrew Brewfile syntax check                       |
-| `validate-flatpaks.yml`  | PR paths: `custom/flatpaks/**`    | Flathub app ID existence check                       |
-| `validate-justfiles.yml` | PR paths: `Justfile`              | `just --list` syntax check                           |
-| `validate-renovate.yml`  | PR paths: `.github/renovate.json` | `renovate-config-validator`                          |
+| File                          | Trigger                           | Purpose                                                       |
+| ----------------------------- | --------------------------------- | ------------------------------------------------------------- |
+| `build-image.yml`             | push main + stable, manual        | Publish `:stable-testing` (main) or `:stable` (stable)        |
+| `promote-main-to-stable.yml`  | push main, manual                 | Squash promotion PR `main` → `stable` via factory reusable    |
+| `sync-stable-to-main.yml`     | push stable                       | Merge direct `stable` hotfixes back to `main` (usually no-op) |
+| `pr-validation.yml`           | PR → main                         | shellcheck + hadolint + pre-commit via `validate-pr`          |
+| `renovate.yml`                | schedule 6h, push renovate config | Self-hosted Renovate runner                                   |
+| `clean.yml`                   | schedule weekly                   | Delete GHCR images older than 90 days                         |
+| `validate-brewfiles.yml`      | PR paths: `custom/brew/**`        | Homebrew Brewfile syntax check                                |
+| `validate-flatpaks.yml`       | PR paths: `custom/flatpaks/**`    | Flathub app ID existence check                                |
+| `validate-justfiles.yml`      | PR paths: `Justfile`              | `just --list` syntax check                                    |
+| `validate-renovate.yml`       | PR paths: `.github/renovate.json` | `renovate-config-validator`                                   |
+
+## Branch Promotion and Tags
+
+- `main` is the testing branch and publishes `:stable-testing` (plus bare
+  `:testing`, which the promotion release gate resolves).
+- `stable` is the production branch and publishes `:stable`.
+- Promotion uses `reusable-promote-squash.yml` and `reusable-sync-branches.yml`
+  from `projectbluefin/actions` — the factory contract. pull[bot] /
+  `.github/pull.yml` was rejected (issues #235/#237); do not add it.
+- The `Determine image tag` step sets `TAG_STREAM=testing` off the production
+  branch; `Finalize branch tags` renames `testing*` tags to `stable-testing-*`
+  so they never collide with production `stable-daily*` aliases.
+- The release gate verifies cosign signatures on `:testing`; keyless signing
+  (optional step in `build-image.yml`) must be enabled for `release/ready`.
 
 ## Composite Action Pins
 

@@ -1,0 +1,47 @@
+---
+name: Promote main to stable
+
+# Two-branch model: `main` is the testing branch (publishes :stable-testing),
+# `stable` is the production branch (publishes :stable). On every push to
+# `main` the shared factory workflow opens (or refreshes) a squash promotion
+# PR from `main` to `stable`; merging it publishes :stable.
+#
+# Reusable logic lives in projectbluefin/actions — this is a thin caller,
+# matching the pattern in projectbluefin/bluefin and projectbluefin/bluefin-lts.
+# pull[bot] was considered and rejected: the factory reusable is auditable,
+# org-maintained, and shared with the other image repos (see issues #235/#237).
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: read
+  statuses: write
+
+concurrency:
+  group: promote-main-to-stable
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: Promote main to stable
+    uses: projectbluefin/actions/.github/workflows/reusable-promote-squash.yml@f8418f73faf163c048ab23f10655235c078d7606 # v1
+    with:
+      variants: >-
+        [{"image":"${{ github.event.repository.name }}"}]
+      cosign_identity_regexp: >-
+        ^https://github\.com/${{ github.repository_owner }}/[^/]+/\.github/workflows/
+      registry: ghcr.io/${{ github.repository_owner }}
+      source_branch: main
+      target_branch: stable
+      # The release gate resolves the :testing tag (published by main builds)
+      # and verifies its cosign signature. Enable the OPTIONAL keyless signing
+      # step in build-image.yml for the gate to report release/ready.
+      run_e2e: false
+    secrets: inherit
