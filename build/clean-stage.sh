@@ -19,8 +19,11 @@ systemctl mask flatpak-add-fedora-repos.service
 rm -f "${CLEAN_ROOT}/usr/lib/systemd/system/flatpak-add-fedora-repos.service"
 
 rm -rf "${CLEAN_ROOT}/.gitkeep"
-find "${CLEAN_ROOT}/var"/* -maxdepth 0 -type d \! -name cache -exec rm -fr {} \;
-find "${CLEAN_ROOT}/var/cache"/* -maxdepth 0 -type d \! -name libdnf5 \! -name rpm-ostree -exec rm -fr {} \;
+# Use -mindepth/-maxdepth instead of shell globs so these are no-ops when the
+# directories are empty (e.g. /var/cache/{libdnf5,rpm-ostree} only exist as
+# transient buildah cache mounts and are not present in this layer).
+find "${CLEAN_ROOT}/var" -mindepth 1 -maxdepth 1 -type d \! -name cache -exec rm -fr {} \;
+find "${CLEAN_ROOT}/var/cache" -mindepth 1 -maxdepth 1 -type d \! -name libdnf5 \! -name rpm-ostree -exec rm -fr {} \;
 
 # Clear tmpfs-backed runtime directories without deleting the directories
 # themselves. Buildah may have bind mounts in these paths during RUN, so
