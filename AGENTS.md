@@ -51,6 +51,12 @@ links lives in `.agents/skills/README.md`.
 
 **When in doubt, don't post.** If the only thing to report is "tests pass", post nothing.
 
+## Branch Strategy & Promotion Workflow
+
+- **`main`**: Testing branch where developer PRs land. Push builds and publishes `:stable-testing` images.
+- **`stable`**: Production branch that builds production `:stable` images.
+- **pull[bot]**: Automatically creates promotion PRs (`main` → `stable`). Humans test `:stable-testing` and merge promotion PRs to release to production.
+
 ## Critical Rules (Enforced)
 
 1. **ALWAYS** use Conventional Commits format for ALL commits (see `.github/commit-convention.md`)
@@ -59,8 +65,8 @@ links lives in `.agents/skills/README.md`.
 4. **ALWAYS** use `dnf5` exclusively (never `dnf`, `yum`, `rpm-ostree`)
 5. **ALWAYS** use `-y` flag for non-interactive installs
 6. **NEVER** use `dnf5` in ujust files — only Brewfile/Flatpak shortcuts
-7. **NEVER** push directly to `main` (only via PR with passing `validate` check)
-8. **ALWAYS** confirm with user before deviating from @ublue-os/bluefin patterns
+7. **NEVER** push directly to `main` or `stable` (only via PR with passing `validate` check)
+8. **ALWAYS** target `main` branch for feature PRs; pull[bot] handles `main` → `stable` promotion
 9. **ALWAYS** run shellcheck/YAML validation before committing
 10. **ALWAYS** follow numbered script convention: `10-*.sh`, `20-*.sh`, `30-*.sh`
 11. **ALWAYS** validate that new Flatpak IDs exist on Flathub before adding
@@ -80,6 +86,7 @@ Assisted-by: [Model Name] via [Tool Name]
 
 ---
 
-**Last Updated**: 2026-08-05
-**Template Version**: finpilot (Agent UX Overhaul)
+**Last Updated**: 2026-08-08
+**Template Version**: finpilot (Two-Branch Testing/Stable Promotion Workflow)
 **Maintainer**: Universal Blue Community
+

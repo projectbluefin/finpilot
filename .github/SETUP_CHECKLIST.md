@@ -45,7 +45,23 @@ git push origin main
 
 **Agent skills:** `finpilot-onboarding` (branch protection), `finpilot-ci` (Renovate config)
 
-### 5. Add "What Makes this Raptor Different" to README
+### 5. Setup Two-Branch Testing/Stable Workflow & pull[bot]
+
+- [ ] Create the `stable` production branch:
+  ```bash
+  git checkout main
+  git checkout -b stable
+  git push origin stable
+  git checkout main
+  ```
+- [ ] Install the [pull](https://github.com/apps/pull) GitHub App on your repository
+- [ ] Replace `OWNER` placeholder in `.github/pull.yml` with your GitHub username or org name
+- [ ] Workflow diagram:
+  ```
+  PR -> main (builds :stable-testing) -> pull[bot] PR -> approve -> stable (builds :stable)
+  ```
+
+### 6. Add "What Makes this Raptor Different" to README
 
 - [ ] Open `README.md`
 - [ ] Paste the raptor section template (see README or use the `finpilot-onboarding` skill)
@@ -54,14 +70,22 @@ git push origin main
 
 **Agent skills:** `finpilot-onboarding` (raptor section), `finpilot-maintain` (maintenance requirement)
 
-### 6. Deploy
+### 7. Deploy
 
-```bash
-sudo bootc switch --transport registry ghcr.io/YOUR_USERNAME/YOUR_REPO:stable
-sudo systemctl reboot
-```
+- Deploy testing image (`main` branch):
+  ```bash
+  sudo bootc switch --transport registry ghcr.io/YOUR_USERNAME/YOUR_REPO:stable-testing
+  sudo systemctl reboot
+  ```
+
+- Deploy production image (`stable` branch):
+  ```bash
+  sudo bootc switch --transport registry ghcr.io/YOUR_USERNAME/YOUR_REPO:stable
+  sudo systemctl reboot
+  ```
 
 ## Optional: Production Features
+
 
 ### Enable Signing (Recommended)
 
