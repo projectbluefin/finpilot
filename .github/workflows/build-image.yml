@@ -12,11 +12,18 @@ on:
   push:
     branches:
       - main
+      - stable
     paths-ignore:
       - "**.md"
       - ".github/workflows/*validate*.yml"
-  schedule:
-    - cron: "05 10 * * *" # 10:05am UTC everyday
+  pull_request:
+    branches:
+      - main
+      - stable
+    paths-ignore:
+      - "**.md"
+      - ".github/workflows/*validate*.yml"
+  merge_group:
   workflow_dispatch:
 
 permissions:
@@ -33,6 +40,8 @@ env:
   IMAGE_KEYWORDS: "bootc,ublue,universal-blue"
   IMAGE_LOGO_URL: "https://avatars.githubusercontent.com/u/120078124?s=200&v=4"
   DEFAULT_TAG: "stable"
+  PRODUCTION_BRANCH: "stable"
+  TESTING_BRANCH: "main"
   REGISTRY_CACHE_WRITE: ${{ github.event_name != 'pull_request' && '1' || '0' }}
   ENABLE_RECHUNKING: "false"
   RECHUNK_MAX_LAYERS: "128"
@@ -57,6 +66,20 @@ jobs:
         run: |
           echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}" >> ${GITHUB_ENV}
           echo "IMAGE_NAME=${IMAGE_NAME,,}" >> ${GITHUB_ENV}
+
+      - name: Determine image tag
+        id: determine-tag
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          # If not on the production branch, this is a testing build
+          if [ "${REF_NAME}" != "${PRODUCTION_BRANCH}" ]; then
+            echo "DEFAULT_TAG=${DEFAULT_TAG}-testing" >> ${GITHUB_ENV}
+            echo "Building testing image: ${DEFAULT_TAG}-testing"
+          else
+            echo "Building production image: ${DEFAULT_TAG}"
+          fi
 
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -145,8 +168,6 @@ jobs:
           allow-write: ${{ github.event_name != 'pull_request' && 'true' || 'false' }}
           cache-bust: ${{ hashFiles('**/Containerfile') }}
 
-      # OPTIONAL: Set ENABLE_RECHUNKING to "true" above to optimize OTA deltas.
-      # This uses OCI-native chunkah and does not require bootc-base-imagectl.
       - name: Rechunk image
         if: env.ENABLE_RECHUNKING == 'true' && github.event_name != 'pull_request'
         id: rechunk-image
@@ -166,7 +187,7 @@ jobs:
                           "${ALIAS_TAGS}"
 
       - name: Login to GitHub Container Registry
-        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ghcr.io
@@ -174,7 +195,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Push to GHCR
-        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        if: github.event_name != 'pull_request'
         id: push
         uses: projectbluefin/actions/bootc-build/push-image@5fe9b3bcfdf3a68b4d2eb459445505b600e456e6 # v1
         with:
@@ -200,6 +221,8 @@ jobs:
       #     push-attestation: true
       #     certificate-identity-regexp: https://github.com/${{ github.repository }}/.github/workflows/
       #     github-token: ${{ secrets.GITHUB_TOKEN }}
+
+
 
       - name: Build telemetry summary
         if: steps.detect-changes.outputs.should_build == 'true' || github.event_name != 'pull_request'
