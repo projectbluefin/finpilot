@@ -48,7 +48,9 @@ Use this prompt first to get your fork building:
 ```
 Bootstrap a new custom OS from @projectbluefin/finpilot. Name it after this repository. Use the `finpilot-onboarding` skill first, then:
 1. Rename `finpilot` in the 7 required files
-2. Enable GitHub Actions and set RENOVATE_TOKEN (repo + workflow scopes)
+2. Enable GitHub Actions and set RENOVATE_TOKEN (classic PAT with `repo` +
+   `workflow` scopes, or a fine-grained token with **Dependabot alerts:
+   Read-only** and **Contents: Read and write**)
 3. Configure branch protection for `main` with `validate` as a required status check
 4. Enable auto-merge
 5. Trigger the first green build on `main`

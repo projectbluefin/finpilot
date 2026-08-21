@@ -3,7 +3,9 @@ Use @projectbluefin/finpilot as a template, name the OS the repository name. Ens
 **Phase 1 — Bootstrap (Do this first):**
 
 1. Rename `finpilot` to the repository name in exactly 7 files (see README section "2. Rename the Project")
-2. Enable GitHub Actions and set `RENOVATE_TOKEN` (Classic PAT with `repo` + `workflow`)
+2. Enable GitHub Actions and set `RENOVATE_TOKEN` (Classic PAT with `repo` +
+   `workflow`, or fine-grained token with **Dependabot alerts: Read-only** and
+   **Contents: Read and write**)
 3. Configure branch protection on `main` with `validate` as required status check
 4. Enable auto-merge in repository settings
 5. Trigger first green build (push to `main` or run workflow manually)
