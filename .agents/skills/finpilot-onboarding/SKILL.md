@@ -82,6 +82,25 @@ This token allows Renovate to open PRs for digest bumps and dependency updates.
 
 This ensures PRs are validated before merging and Renovate can auto-merge safe digest updates.
 
+## Set Up Promotion (Stable Branch)
+
+Create `stable` as an exact copy of `main` (git commands in `SETUP_CHECKLIST.md`
+step 3). The `promote-main-to-stable.yml` workflow then automates releases:
+
+1. Pushes to `main` publish `:stable-testing`; a squash PR to `stable` opens
+   automatically whenever the trees differ
+2. The PR requests review from `<owner>/maintainers` — org forks need that
+   team; personal-account forks should replace the caller workflow with a
+   local one that skips reviewer requests
+3. `stable`'s required approvals set the automation level: `0` = fully
+   automatic, `1` = review, then auto-merge
+4. Keyless signing (enabled by default) feeds the release gate — signed
+   `:testing` images report `release/ready`; unsigned images report
+   `release/blocked`
+
+Full requirements live in `SETUP_CHECKLIST.md` → step 3; promotion mechanics
+in `finpilot-ci`.
+
 ## First Green Build
 
 After the rename and secret setup, trigger a build:
@@ -92,7 +111,7 @@ After the rename and secret setup, trigger a build:
 Monitor the workflow. A successful first build:
 
 - Passes `bootc container lint --fatal-warnings`
-- Publishes `:stable` and `:stable.YYYYMMDD` tags to GHCR
+- Publishes `:stable-testing` and `:testing` tags to GHCR (`stable` branch builds publish `:stable`)
 - Appears under **Packages** in your repository
 
 ## README "What Makes this Raptor Different" Section

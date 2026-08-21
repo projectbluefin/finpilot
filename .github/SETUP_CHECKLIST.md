@@ -38,8 +38,21 @@ git switch main
 ```
 
 - [ ] Never commit directly to `stable`; it receives only promotion PRs
-- [ ] Enable keyless signing (see "Enable Signing" below) so the promotion
-      release gate can verify image signatures and report `release/ready`
+- [ ] Keyless signing is enabled by default; after the first build, verify it
+      (see "Verify Image Signing" below) so the promotion release gate can
+      check signatures and report `release/ready`
+
+Promotion PR requirements:
+
+- The promote workflow requests review from `<owner>/maintainers` when it
+  creates the PR — your repo must live in an org with that team, or replace
+  `promote-main-to-stable.yml` with a local workflow that skips reviewer
+  requests (the reviewer is set inside the shared `projectbluefin/actions`
+  reusable, so editing only your caller file won't change it)
+- Set `stable`'s required approvals to choose your automation level: `0` =
+  fully automatic promotion, `1` = a maintainer approves, then auto-merge
+- The release gate is advisory by default; add the promote workflow as a
+  required check on `stable` if a `release/blocked` result should block merges
 
 ### 4. First Push
 
@@ -105,16 +118,23 @@ sudo systemctl reboot
 
 ## Optional: Production Features
 
-### Enable Signing (Recommended)
+### Verify Image Signing (Enabled by Default)
 
-This template uses keyless OIDC signing — no keys or secrets are required.
+Images are signed automatically with keyless OIDC signing — no keys or
+secrets to configure. After the first green build, verify the signature:
 
-- [ ] Edit `.github/workflows/build-image.yml`
-- [ ] Find the "OPTIONAL: Sign and attest" section
-- [ ] Uncomment the `Sign and publish` step
-- [ ] Commit and push (via PR to `main`)
+```bash
+cosign verify \
+  --certificate-identity-regexp="https://github.com/YOUR_USERNAME/YOUR_REPO/.github/workflows/" \
+  --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+  ghcr.io/YOUR_USERNAME/YOUR_REPO:stable-testing
+```
 
-**Agent skill:** `finpilot-templates` (signing setup)
+To disable signing (not recommended), comment out the `Sign and publish`
+step in `.github/workflows/build-image.yml`. Unsigned images fail the
+promotion release gate (`release/blocked`).
+
+**Agent skill:** `finpilot-templates` (signing verification)
 
 ### Enable Rechunking (Optional)
 
@@ -138,7 +158,7 @@ Which skill to load for each checklist block above:
 | Branches + promotion (step 3)         | `finpilot-onboarding`, `finpilot-ci`        |
 | Renovate + branch protection (step 5) | `finpilot-onboarding`, `finpilot-ci`        |
 | Raptor section (step 6)               | `finpilot-onboarding`, `finpilot-maintain`  |
-| Signing (optional)                    | `finpilot-templates`                        |
+| Signing verification (default on)     | `finpilot-templates`                        |
 | Rechunking (optional)                 | `finpilot-ci`                               |
 
 **Cross-link requirement**: Whenever you add or remove a package, app, or service **after** initial setup, update the README raptor section and its `*Last updated*` date. This is required by the `finpilot-maintain` skill.

@@ -1,6 +1,6 @@
 # Flatpak Preinstall Integration
 
-This directory contains Flatpak preinstall configuration files that will be copied into your custom image at `/etc/flatpak/preinstall.d/`.
+This directory contains Flatpak preinstall configuration files that will be copied into your custom image at `/usr/share/flatpak/preinstall.d/`.
 
 ## What is Flatpak Preinstall?
 
@@ -8,7 +8,7 @@ Flatpak preinstall is a feature that allows system administrators to define Flat
 
 ## How It Works
 
-1. **During Build**: Files in this directory are copied to `/etc/flatpak/preinstall.d/` in the image
+1. **During Build**: Files in this directory are copied to `/usr/share/flatpak/preinstall.d/` in the image
 2. **On First Boot**: After user setup completes, the system reads these files and installs the specified Flatpaks
 3. **User Experience**: Applications appear automatically after first login
 
@@ -51,7 +51,7 @@ See: https://docs.flatpak.org/en/latest/flatpak-command-reference.html#flatpak-p
 
 1. Edit [`default.preinstall`](default.preinstall) or create new `.preinstall` files in this directory
 2. Add Flatpak references in INI format with `[Flatpak Preinstall NAME]` sections
-3. Build your image - the files will be copied to `/etc/flatpak/preinstall.d/`
+3. Build your image - the files will be copied to `/usr/share/flatpak/preinstall.d/`
 4. After user setup completes, Flatpaks will be automatically installed
 
 **Example Files in this directory:**

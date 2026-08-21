@@ -61,8 +61,8 @@ release, update both the `FEDORA_MAJOR_VERSION` ARG and the base image tag.
 
 ### Template build script rules
 
-- **Default packages**: build scripts in the template must have **no packages installed by default** — only commented examples. Users add their own.
-- **Exception**: `dnf5 install -y tmux` is intentionally present as a minimal smoke-test that the DNF cache is warm. Do not remove it.
+- **Default packages**: build scripts in the template must have **no extra packages installed by default** — only commented examples. Users add their own.
+- **Exception**: `dnf5 install -y tmux gum` in `build/10-build.sh` is intentional: tmux smoke-tests that the DNF cache is warm, and gum is required by the ujust recipes' interactive prompts. Do not remove.
 - Always use `dnf5` — never `dnf`, `yum`, or `rpm-ostree`
 - Always use `dnf5 install -y` (non-interactive)
 - COPR: enable → install → `copr_install_isolated` (auto-disables); never leave a repo enabled

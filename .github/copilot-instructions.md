@@ -17,7 +17,7 @@ Use @projectbluefin/finpilot as a template, name the OS the repository name. Ens
 
 **Phase 3 — Production:**
 
-1. Enable keyless signing by uncommenting the step in `.github/workflows/build-image.yml`
+1. Keyless signing is enabled by default in `.github/workflows/build-image.yml`
 2. Verify with: `cosign verify --certificate-identity-regexp="https://github.com/USER/REPO/.github/workflows/" --certificate-oidc-issuer="https://token.actions.githubusercontent.com" ghcr.io/USER/REPO:stable`
 3. Use the `finpilot-maintain` skill for the ongoing maintenance schedule
 

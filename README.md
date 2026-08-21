@@ -89,7 +89,7 @@ Use the `finpilot-maintain` and `finpilot-ci` skills, then:
 - Automatic cleanup of old images (90+ days) to keep it tidy
 - Pull request workflow - test changes before merging to main
   - PRs build and validate before merge
-  - `main` branch builds `:stable` images
+  - `main` builds `:stable-testing`; merging the auto-opened promotion PR to `stable` publishes `:stable`
 - Validates your files on pull requests so you never break a build:
   - Brewfile, Justfile, ShellCheck, Renovate config, and it'll even check to make sure the flatpak you add exists on FlatHub
 - Production Grade Features
@@ -225,14 +225,38 @@ All changes should be made via pull requests:
    - Brewfile, Flatpak, Justfile, and shellcheck validation
    - Test image build
 3. Once checks pass, merge the PR
-4. Merging triggers publishes a `:stable` image
+4. Merging to `main` publishes a `:stable-testing` image; the promotion PR it opens publishes `:stable` when merged
 
-### 8. Deploy Your Image
+### 8. Promote to Stable
 
-Switch to your image:
+The template uses a two-branch release model:
+
+| Branch   | Image tag                        | Audience                       |
+| -------- | -------------------------------- | ------------------------------ |
+| `main`   | `:stable-testing` (+ `:testing`) | Testers and release candidates |
+| `stable` | `:stable`                        | Production systems             |
+
+When `stable` differs from `main`, the [`promote-main-to-stable`](.github/workflows/promote-main-to-stable.yml) workflow opens a squash promotion PR automatically, enables auto-merge, and runs a release gate that verifies image signatures on `:testing`. Direct pushes to `stable` are not part of the workflow; hotfixes made there are merged back into `main` by [`sync-stable-to-main`](.github/workflows/sync-stable-to-main.yml).
+
+For the automated promotion PR to open, your repository needs:
+
+- An **organization-owned repo with a `maintainers` team** — the workflow requests review from `<owner>/maintainers` when creating the PR. Personal-account forks can replace `.github/workflows/promote-main-to-stable.yml` with a local version that skips reviewer requests.
+- Branch protection on `stable`: **0 required approvals** means fully automatic promotion; **1 approval** means review, then auto-merge.
+- The release gate is advisory by default — make the promote workflow a required check on `stable` if a `release/blocked` result should block merging.
+
+### 9. Deploy Your Image
+
+Test the candidate from `main` first:
 
 ```bash
-sudo bootc switch ghcr.io/your-username/your-repo-name:stable
+sudo bootc switch --transport registry ghcr.io/your-username/your-repo-name:stable-testing
+sudo systemctl reboot
+```
+
+After merging the promotion PR, deploy production:
+
+```bash
+sudo bootc switch --transport registry ghcr.io/your-username/your-repo-name:stable
 sudo systemctl reboot
 ```
 

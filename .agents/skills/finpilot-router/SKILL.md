@@ -30,6 +30,7 @@ description: >-
 | I need to…                                     | Load                                      |
 | ---------------------------------------------- | ----------------------------------------- |
 | Bootstrap a new fork                           | `finpilot-onboarding`                  |
+| Set up promotion / stable branch / release gate | `finpilot-onboarding`, `finpilot-ci`   |
 | Add/remove a package                           | `finpilot-packages`                    |
 | Change Brewfiles, Flatpaks, or ujust           | `finpilot-custom`                      |
 | Change Containerfile, Justfile, or build/\*.sh | `finpilot-build`                       |

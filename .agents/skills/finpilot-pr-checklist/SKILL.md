@@ -155,6 +155,18 @@ just --list
 
 **CI triggers:** None by default (consider adding `markdownlint` to pre-commit)
 
+### Repo-wide Doc Sweeps
+
+| Check                   | Command                                                              |
+| ----------------------- | -------------------------------------------------------------------- |
+| Include dot-directories | `grep -rn "pattern" .github .agents` (don't rely on `grep -r .` alone) |
+
+`.github/` and `.agents/` hold most of this template's docs, skills, and
+workflows. A recursive search rooted at `.` can silently skip dot-directories
+depending on grep configuration — target them explicitly when auditing docs
+for stale claims, and verify every reported location against the real file
+before editing.
+
 ---
 
 ## PR Status Check Reference
