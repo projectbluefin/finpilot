@@ -30,7 +30,7 @@ jobs:
 
       - env:
           # renovate: datasource=npm depName=renovate
-          RENOVATE_VERSION: "44.14.10"
+          RENOVATE_VERSION: "44.34.3"
         run: npm install -g "renovate@${RENOVATE_VERSION}"
 
       - run: renovate-config-validator .github/renovate.json
