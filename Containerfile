@@ -4,15 +4,14 @@
 # Name: finpilot
 #
 # IMPORTANT: Change "finpilot" above to your desired project name.
-# This name should be used consistently throughout the repository in:
-#   - Justfile: export IMAGE_NAME := env("IMAGE_NAME", "your-name-here")
-#   - README.md: # your-name-here (title)
-#   - artifacthub-repo.yml: repositoryID: your-name-here
-#   - custom/ujust/README.md: localhost/your-name-here:stable (in bootc switch example)
+# This name is restated in several files that cannot read each other. The
+# authoritative name at publish time is the repository name: build-image.yml
+# derives IMAGE_NAME from ${{ github.event.repository.name }} and pushes the
+# GHCR package under it. The value below is the fallback used by local
+# `just build` and by the image-identity metadata written into the image.
 #
-# The project name defined here is the single source of truth for your
-# custom image's identity. When changing it, update all references above
-# to maintain consistency.
+# When forking, update every site listed under "Rename the Project" in
+# README.md. Nothing validates that these agree — see issue #291.
 ###############################################################################
 
 ###############################################################################
