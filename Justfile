@@ -416,3 +416,14 @@ format:
     fi
     # Run shfmt on all Bash scripts
     /usr/bin/find . -iname "*.sh" -type f -exec shfmt --write "{}" ';'
+
+# Runs the BATS unit tests in tests/unit
+test-unit:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Check if bats is installed
+    if ! command -v bats &> /dev/null; then
+        echo "bats could not be found. Install bats-core: https://bats-core.readthedocs.io"
+        exit 1
+    fi
+    bats tests/unit
