@@ -34,12 +34,10 @@
       "automergeStrategy": "squash"
     },
     {
-      "description": "Keep the shared projectbluefin actions channel fresh",
+      "description": "Keep the shared projectbluefin actions channel fresh (human review required — executable CI code)",
       "matchPackageNames": ["projectbluefin/actions"],
       "matchUpdateTypes": ["digest", "pinDigest", "pin", "patch", "minor"],
-      "automerge": true,
-      "automergeType": "pr",
-      "automergeStrategy": "squash"
+      "automerge": false
     },
     {
       "description": "Keep first-party OCI context images fresh immediately",
@@ -53,6 +51,11 @@
       "matchDepNames": ["quay.io/fedora-ostree-desktops/silverblue"],
       "matchUpdateTypes": ["major"],
       "enabled": false
+    },
+    {
+      "description": "Require human review for GitHub Actions updates — automerged action SHA bumps would run unreviewed code in privileged workflows (packages:write, id-token:write, secrets:inherit). Last matching rule wins, so keep this rule last.",
+      "matchManagers": ["github-actions"],
+      "automerge": false
     }
   ]
 }
