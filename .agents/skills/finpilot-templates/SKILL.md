@@ -66,11 +66,14 @@ When forking, change `finpilot` → your image name in exactly these locations:
 | 2   | `Justfile`                    | `export IMAGE_NAME := env("IMAGE_NAME", "finpilot")`                |
 | 3   | `README.md`                   | Title `# finpilot`                                                  |
 | 4   | `artifacthub-repo.yml`        | `repositoryID: finpilot`                                            |
-| 5   | `custom/ujust/README.md`      | `localhost/your-repo-name:stable` in the bootc switch example    |
+| 5   | `custom/ujust/README.md`      | `localhost/finpilot:stable` in the bootc switch example              |
 | 6   | `.github/workflows/clean.yml` | `packages: finpilot`                                                |
-| 7   | `iso/iso.toml`                | `ghcr.io/USERNAME/REPO:stable` in the bootc switch URL              |
+| 7   | `iso/iso.toml`                | `ghcr.io/projectbluefin/finpilot:stable` in the bootc switch URL    |
 
 Missing any of these causes the image to be published or cleaned up under the wrong name.
+Sites 5 and 7 used to ship the literal placeholders `your-repo-name` and
+`USERNAME/REPO`; they now carry this repo's real identity so the template is
+self-consistent. Nothing validates that the seven agree — see issue #291.
 
 ## Image Identity ARGs
 
