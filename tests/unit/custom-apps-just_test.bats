@@ -222,17 +222,15 @@ _log_line() {
     grep -qF "jetbrains-toolbox launched" "${COMMAND_LOG}"
 }
 
-@test "install-jetbrains-toolbox: characterizes the un-gated checksum failure" {
-    # KNOWN GAP (characterization test, not an endorsement): the recipe body
-    # has no `set -euo pipefail`, so a failing `sha256sum -c` does not stop the
-    # recipe — the unverified tarball is still extracted and executed. This test
-    # pins the current behaviour so a future fix that adds the guard shows up as
-    # an intentional, reviewed change to this assertion rather than a silent one.
+@test "install-jetbrains-toolbox aborts before extracting when the checksum fails" {
+    # The recipe body has `set -euo pipefail`, so a failing `sha256sum -c`
+    # stops the recipe — the unverified tarball is never extracted or run.
     _run_recipe "install-jetbrains-toolbox" MOCK_SHA_OK=0
 
+    [ "${status}" -ne 0 ]
     grep -qF "sha256sum -c" "${COMMAND_LOG}"
-    [ "$(grep -cF "tar zxf" "${COMMAND_LOG}")" -eq 1 ]
-    [ -x "${HOME}/.local/share/JetBrains/ToolboxApp/bin/jetbrains-toolbox" ]
+    [ "$(grep -cF "tar zxf" "${COMMAND_LOG}")" -eq 0 ]
+    [ ! -e "${HOME}/.local/share/JetBrains/ToolboxApp/bin/jetbrains-toolbox" ]
 }
 
 @test "install-jetbrains-toolbox resolves the build version from the releases feed" {
