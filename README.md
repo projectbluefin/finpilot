@@ -253,6 +253,8 @@ For the automated promotion PR to open, your repository needs:
 - Branch protection on `stable`: **0 required approvals** means fully automatic promotion; **1 approval** means review, then auto-merge.
 - The release gate is advisory by default — make the promote workflow a required check on `stable` if a `release/blocked` result should block merging.
 
+> **Known release risk:** the release gate currently checks digest and cosign signature only — `run_e2e` is `false` in `promote-main-to-stable.yml` because this repository has no post-build/post-merge E2E workflow or `e2e_image` configured for the shared gate to exercise. Until an E2E workflow is added and `run_e2e: true` (with `e2e_image`/`e2e_suites`) is configured, treat a `release/ready` result as "signed and unmodified," not "functionally validated." See [#281](https://github.com/projectbluefin/finpilot/issues/281).
+
 ### 9. Deploy Your Image
 
 Test the candidate from `main` first:

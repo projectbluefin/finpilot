@@ -40,6 +40,9 @@ links lives in `.agents/skills/README.md`.
 The promotion release gate verifies cosign signatures on the `:testing` tag;
 keyless signing is enabled by default in `build-image.yml` ("Sign and publish"
 step) and reports `release/ready` once a signed `:testing` image exists.
+**Known gap:** the gate does not run E2E validation (`run_e2e: false`, no
+`e2e_image` configured) — `release/ready` means "signed," not "functionally
+tested." See README.md "Promote to Stable" and issue #281.
 
 ## CRITICAL: GitHub API Usage
 
