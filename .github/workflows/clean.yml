@@ -20,13 +20,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
+      - name: Resolve package name
+        id: package
+        shell: bash
+        run: |
+          # Derive the cleanup target from the repository name (lowercased),
+          # exactly as build-image.yml derives the publish target — so a
+          # renamed fork cleans the package it actually pushes (see #291).
+          name="${{ github.event.repository.name }}"
+          echo "name=${name,,}" >> "${GITHUB_OUTPUT}"
+
       - name: Cleanup old images
         uses: projectbluefin/actions/bootc-build/ghcr-cleanup@9c699818ddf1043b8f5af8b862f59f783c6c7bda # v1
         with:
-          # IMPORTANT: Update this to match your image name from Containerfile (# Name: comment)
-          # This should match the "# Name: your-repo-name" comment in your Containerfile
-          # Example: If your Containerfile has "# Name: my-custom-os", use "my-custom-os" here
-          packages: finpilot
+          packages: ${{ steps.package.outputs.name }}
           older-than: 90 days
           keep-n-tagged: 7
           keep-n-untagged: 7

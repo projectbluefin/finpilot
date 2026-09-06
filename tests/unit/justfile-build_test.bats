@@ -190,16 +190,15 @@ podman_build_args() {
     [[ "${args}" == *"--build-arg UBLUE_IMAGE_TAG=pinned"* ]]
 }
 
-# Characterization test: `IMAGE_NAME` is exported by the Justfile itself with a
-# default of "finpilot", so `${IMAGE_NAME:-${target_image}}` can never fall back
-# to the positional target_image. Building under a different name therefore
-# still labels the image identity "finpilot". Pinned here so a fix is visible.
-@test "build: IMAGE_NAME build arg ignores the positional target_image" {
+# The positional target_image wins for the image identity: `target_image`
+# already defaults to IMAGE_NAME, so the default invocation is unchanged
+# while `just build otherimage stable` now labels the identity "otherimage".
+@test "build: IMAGE_NAME build arg follows the positional target_image" {
     run_just build otherimage stable
     [ "$status" -eq 0 ]
     local args
     args="$(podman_build_args)"
-    [[ "${args}" == *"--build-arg IMAGE_NAME=finpilot"* ]]
+    [[ "${args}" == *"--build-arg IMAGE_NAME=otherimage"* ]]
     [[ "${args}" == *"--tag otherimage:stable"* ]]
 }
 

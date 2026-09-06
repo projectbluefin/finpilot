@@ -1,0 +1,49 @@
+name: Unit Tests
+
+on:
+  pull_request:
+    branches: [main, stable]
+    paths:
+      - "build/**"
+      - "tests/**"
+      - "Justfile"
+      - ".github/workflows/unit-tests.yml"
+  push:
+    branches: [main, stable]
+    paths:
+      - "build/**"
+      - "tests/**"
+      - "Justfile"
+      - ".github/workflows/unit-tests.yml"
+  merge_group:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions: {}
+
+jobs:
+  bats:
+    name: BATS unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Install just
+        env:
+          # renovate: datasource=github-releases depName=casey/just
+          JUST_VERSION: "1.42.0"
+        run: |
+          set -euo pipefail
+          curl -sSfL -o just.tar.gz "https://github.com/casey/just/releases/download/${JUST_VERSION}/just-${JUST_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+          tar xzf just.tar.gz -C /tmp just
+          sudo install -m 0755 /tmp/just /usr/local/bin/just
+          just --version
+      - name: Install bats
+        run: sudo apt-get update && sudo apt-get install -y bats
+      - name: Run unit tests
+        run: bats --print-output-on-failure tests/unit

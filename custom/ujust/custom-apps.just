@@ -40,6 +40,7 @@ install-all-brew:
 [group('Apps')]
 install-jetbrains-toolbox:
     #!/usr/bin/env bash
+    set -euo pipefail
     echo "Installing JetBrains Toolbox..."
     pushd "$(mktemp -d)"
     echo "Fetching latest version..."
