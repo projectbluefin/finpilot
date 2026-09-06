@@ -141,6 +141,13 @@ Important: Change `finpilot` to your repository name in these 7 files:
 6. `.github/workflows/clean.yml` (`packages`): `packages: your-repo-name`
 7. `iso/iso.toml` (bootc switch URL): `ghcr.io/YOUR_USERNAME/your-repo-name:stable`
 
+Nothing validates that these seven agree with each other, and none of them is
+the name actually published: `build-image.yml` derives `IMAGE_NAME` from
+`github.event.repository.name` and pushes the GHCR package under that value.
+Site 7 in particular is load-bearing at runtime — `just build-iso` bakes it into
+the installer kickstart, so a missed rename pins first boot to a registry ref
+that does not exist. See [issue #291](https://github.com/projectbluefin/finpilot/issues/291).
+
 ### 3. Enable GitHub Actions
 
 - Go to the "Actions" tab in your repository
