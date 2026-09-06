@@ -57,6 +57,7 @@ jobs:
       packages: write
       id-token: write
       attestations: write
+      actions: write # dispatch post-merge-e2e.yml for the promotion release gate
 
     steps:
       - name: Prepare environment
@@ -268,6 +269,31 @@ jobs:
           push-attestation: true
           certificate-identity-regexp: https://github.com/${{ github.repository }}/.github/workflows/
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Per-HEAD E2E gate run for the main → stable promotion release gate
+      # (issue #284). The shared promotion gate requires a successful
+      # Post-Merge E2E run recorded on the promoted main HEAD SHA; dispatch
+      # one now that this build's digest is on :testing. The expected-digest
+      # binding makes the run fail if :testing no longer points at what this
+      # build pushed. Functional smoke inside that workflow is advisory and
+      # opt-in (E2E_ADVISORY_SMOKE repo variable) — see post-merge-e2e.yml.
+      - name: Dispatch Post-Merge E2E for promotion gate
+        if: github.event_name != 'pull_request' && github.ref_name == 'main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          OWNER: ${{ github.repository_owner }}
+          PUSH_DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          set -euo pipefail
+          IMAGE_REF="ghcr.io/$(echo "${OWNER}" | tr '[:upper:]' '[:lower:]')/${IMAGE_NAME}:testing"
+          gh workflow run post-merge-e2e.yml \
+            --repo "${{ github.repository }}" \
+            --ref main \
+            -f image="${IMAGE_REF}" \
+            -f expected-digest="${PUSH_DIGEST}" \
+            -f suites="smoke"
+          echo "Dispatched Post-Merge E2E for ${IMAGE_REF}@${PUSH_DIGEST}"
 
       - name: Build telemetry summary
         if: steps.detect-changes.outputs.should_build == 'true' || github.event_name != 'pull_request'

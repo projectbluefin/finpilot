@@ -1,0 +1,123 @@
+---
+name: Post-Merge E2E
+
+# Per-commit E2E gate run for the main → stable promotion release gate
+# (promote-main-to-stable.yml passes run_e2e: true — issue #284).
+#
+# The shared gate (projectbluefin/actions reusable-promote-squash.yml →
+# reusable-release-gate.yml) resolves E2E runs by head SHA: it requires a
+# completed, successful run of a workflow named post-merge-e2e.yml or
+# post-testing-e2e.yml recorded on the promoted main HEAD. This file's NAME
+# and PATH are load-bearing for that lookup — rename only together with the
+# gate's selector.
+#
+# Triggers:
+#   - build-image.yml dispatches it after every main-branch image build,
+#     passing the pushed digest as expected-digest (tag↔digest binding).
+#   - promote-main-to-stable.yml backfills dispatches for main heads with no
+#     recorded run (docs-only pushes skip the build via paths-ignore).
+#
+# What the blocking gate verifies (bluefin-lts post-testing-e2e.yml pattern):
+#   - :testing resolves to the digest the build pushed (when expected-digest
+#     is provided), and
+#   - the manifest is well-formed OCI/Docker image metadata.
+#
+# Functional desktop smoke is intentionally NOT a promotion blocker yet:
+# suite selection and thresholds for the shared factory are an open design
+# decision tracked in #281 (docs: #328). When the repository variable
+# E2E_ADVISORY_SMOKE=1 is set, this workflow additionally fires the
+# testsuite smoke suite via run-testsuite.yml against the exact verified
+# digest. That run is fire-and-forget: it surfaces as its own workflow run
+# and commit check, and can never flip the promotion gate.
+
+on:
+  workflow_dispatch:
+    inputs:
+      image:
+        description: Full image reference to test
+        required: false
+        default: ghcr.io/projectbluefin/finpilot:testing
+        type: string
+      suites:
+        description: Comma-separated list of test suites to run (advisory smoke)
+        required: false
+        default: smoke
+        type: string
+      expected-digest:
+        description: Expected immutable digest for the image (from the build that dispatched this run)
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+  packages: write # testsuite pushes screenshot OCI artifacts to GHCR
+
+concurrency:
+  group: post-merge-e2e-${{ github.event.inputs.image || 'default' }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: Verify release image
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      verified_ref: ${{ steps.verify.outputs.verified_ref }}
+    steps:
+      - name: Verify image digest and manifest
+        id: verify
+        env:
+          EXPECTED_DIGEST: ${{ inputs.expected-digest }}
+          IMAGE_REF: ${{ inputs.image }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Checking image manifest for ${IMAGE_REF}"
+          actual_digest="$(skopeo inspect --format '{{.Digest}}' "docker://${IMAGE_REF}")"
+          if [[ -n "${EXPECTED_DIGEST}" && "${actual_digest}" != "${EXPECTED_DIGEST}" ]]; then
+            echo "::error::${IMAGE_REF} resolved to ${actual_digest}, expected ${EXPECTED_DIGEST}"
+            exit 1
+          fi
+          raw_manifest="$(skopeo inspect --raw "docker://${IMAGE_REF}")"
+          echo "${raw_manifest}" | jq -e '
+            (.mediaType == "application/vnd.oci.image.index.v1+json"
+              or .mediaType == "application/vnd.docker.distribution.manifest.list.v2+json"
+              or .mediaType == "application/vnd.oci.image.manifest.v1+json"
+              or .mediaType == "application/vnd.docker.distribution.manifest.v2+json")
+          ' >/dev/null
+          echo "Verified ${IMAGE_REF} -> ${actual_digest} is a well-formed image manifest."
+          # Pin to the immutable digest for downstream jobs (base ref, no tag).
+          base="${IMAGE_REF%%@*}"
+          base="${base%:*}"
+          echo "verified_ref=${base}@${actual_digest}" >> "$GITHUB_OUTPUT"
+
+  # Advisory (non-blocking) functional smoke — see workflow header. Gated on
+  # the E2E_ADVISORY_SMOKE repository variable and on the verification job
+  # above, so smoke always tests the exact digest the gate verified.
+  # continue-on-error is not permitted on reusable-workflow call jobs, so
+  # instead of calling run-testsuite.yml inline this dispatches it: the
+  # dispatched run is independent and can never fail this gate run.
+  dispatch-advisory-smoke:
+    name: Dispatch advisory smoke (non-blocking)
+    needs: [e2e]
+    if: vars.E2E_ADVISORY_SMOKE == '1' && needs.e2e.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Fire testsuite smoke against the verified digest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE_REF: ${{ needs.e2e.outputs.verified_ref }}
+          REPO: ${{ github.repository }}
+          SUITES: ${{ inputs.suites }}
+        run: |
+          gh workflow run run-testsuite.yml \
+            --repo "${REPO}" \
+            --ref main \
+            -f image="${IMAGE_REF}" \
+            -f suites="${SUITES}"
+          echo "Dispatched advisory smoke for ${IMAGE_REF} (suites: ${SUITES})."

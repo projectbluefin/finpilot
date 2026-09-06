@@ -10,11 +10,30 @@ name: Promote main to stable
 # matching the pattern in projectbluefin/bluefin and projectbluefin/bluefin-lts.
 # pull[bot] was considered and rejected: the factory reusable is auditable,
 # org-maintained, and shared with the other image repos (see issues #235/#237).
+#
+# E2E release gate (issue #284): the shared gate requires a completed,
+# successful `Post-Merge E2E` run (post-merge-e2e.yml) recorded on the
+# promoted main HEAD SHA before it reports release/ready. build-image.yml
+# dispatches that run after every main build; dispatch-missing-e2e below
+# backfills it for pushes that skip the build (docs-only changes). Each
+# completed Post-Merge E2E run re-triggers this workflow via workflow_run,
+# so the promotion PR's gate section self-heals once the run lands.
 
 on:
   push:
     branches:
       - main
+  # Re-evaluate the promotion once the Post-Merge E2E run for the current
+  # main HEAD completes (success or failure — a failed run must flip the
+  # promotion PR to release/blocked).
+  workflow_run:
+    workflows: ["Post-Merge E2E"]
+    types: [completed]
+    branches: [main]
+  # Daily reconciliation (matches the bluefin/bluefin-lts cadence) so a
+  # promotion PR never waits on a missed trigger.
+  schedule:
+    - cron: '0 4 * * *'
   workflow_dispatch:
 
 permissions:
@@ -32,6 +51,9 @@ concurrency:
 jobs:
   promote:
     name: Promote main to stable
+    # workflow_run events fire for failed E2E runs too. Re-evaluating on a
+    # failed run is intentional: the gate finds the failed run and flips the
+    # promotion PR to release/blocked. Nothing here needs skipping.
     uses: projectbluefin/actions/.github/workflows/reusable-promote-squash.yml@9c699818ddf1043b8f5af8b862f59f783c6c7bda # v1
     with:
       variants: >-
@@ -41,8 +63,58 @@ jobs:
       registry: ghcr.io/${{ github.repository_owner }}
       source_branch: main
       target_branch: stable
-      # The release gate resolves the :testing tag (published by main builds)
-      # and verifies its cosign signature. Enable the OPTIONAL keyless signing
-      # step in build-image.yml for the gate to report release/ready.
-      run_e2e: false
+      # Release gate (issue #284): digest and cosign checks alone no longer
+      # report release/ready. The gate additionally requires a successful
+      # Post-Merge E2E run recorded on the promoted main HEAD SHA. The
+      # OPTIONAL keyless signing step in build-image.yml must stay enabled
+      # for the cosign leg to pass.
+      run_e2e: true
+      e2e_image: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:testing
+      e2e_suites: smoke
     secrets: inherit
+
+  # The release gate requires a successful Post-Merge E2E run on the current
+  # main HEAD, but build-image.yml only dispatches one after an image build —
+  # and its paths-ignore skips the build entirely for docs-only pushes. When
+  # no run is recorded for HEAD, backfill one: each completed run re-triggers
+  # this workflow (workflow_run), the gate then finds it, and the promotion
+  # PR recovers. Pattern: bluefin-lts promote-testing-to-main.yml.
+  dispatch-missing-e2e:
+    name: Backfill E2E for main head
+    if: github.event_name != 'workflow_run'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Dispatch Post-Merge E2E when no successful run exists for HEAD
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          main_head="$(gh api "repos/${REPO}/branches/main" --jq '.commit.sha')"
+          echo "Main HEAD: ${main_head}"
+
+          existing="$(gh run list \
+            --repo "${REPO}" \
+            --workflow post-merge-e2e.yml \
+            --branch main \
+            --status success \
+            --json headSha \
+            --jq "[.[] | select(.headSha == \"${main_head}\")] | length")"
+
+          if [[ "${existing}" == "0" ]]; then
+            # No expected-digest here: this backfill path has no fresh build
+            # to bind to, so the run verifies whatever :testing currently
+            # serves. Build-triggered runs (build-image.yml) carry the
+            # expected-digest binding instead.
+            gh workflow run post-merge-e2e.yml \
+              --repo "${REPO}" \
+              --ref main
+            echo "Dispatched Post-Merge E2E for ${main_head}."
+          else
+            echo "Successful Post-Merge E2E already recorded for ${main_head}; skipping dispatch."
+          fi

@@ -245,13 +245,14 @@ The template uses a two-branch release model:
 | `main`   | `:stable-testing` (+ `:testing`) | Testers and release candidates |
 | `stable` | `:stable`                        | Production systems             |
 
-When `stable` differs from `main`, the [`promote-main-to-stable`](.github/workflows/promote-main-to-stable.yml) workflow opens a squash promotion PR automatically, enables auto-merge, and runs a release gate that verifies image signatures on `:testing`. Direct pushes to `stable` are not part of the workflow; hotfixes made there are merged back into `main` by [`sync-stable-to-main`](.github/workflows/sync-stable-to-main.yml).
+When `stable` differs from `main`, the [`promote-main-to-stable`](.github/workflows/promote-main-to-stable.yml) workflow opens a squash promotion PR automatically, enables auto-merge, and runs a release gate that verifies image signatures and a per-commit `Post-Merge E2E` check on `:testing`. Direct pushes to `stable` are not part of the workflow; hotfixes made there are merged back into `main` by [`sync-stable-to-main`](.github/workflows/sync-stable-to-main.yml).
 
 For the automated promotion PR to open, your repository needs:
 
 - An **organization-owned repo with a `maintainers` team** — the workflow requests review from `<owner>/maintainers` when creating the PR. Personal-account forks can replace `.github/workflows/promote-main-to-stable.yml` with a local version that skips reviewer requests.
 - Branch protection on `stable`: **0 required approvals** means fully automatic promotion; **1 approval** means review, then auto-merge.
 - The release gate is advisory by default — make the promote workflow a required check on `stable` if a `release/blocked` result should block merging.
+- The gate also requires a successful per-commit `Post-Merge E2E` run (digest/manifest verification dispatched by `build-image.yml`) for `release/ready`; functional desktop smoke is opt-in via the `E2E_ADVISORY_SMOKE` repository variable pending [#281](https://github.com/projectbluefin/finpilot/issues/281).
 
 ### 9. Deploy Your Image
 
