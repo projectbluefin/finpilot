@@ -7,9 +7,11 @@
 [customizations.installer.kickstart]
 contents = """
 %post
-# After installation, switch to the custom image from this repository
-# IMPORTANT: Update this URL to match your repository (ghcr.io/USERNAME/REPO:stable)
-bootc switch --mutate-in-place --transport registry ghcr.io/USERNAME/REPO:stable
+# After installation, switch to the custom image from this repository.
+# FORK NOTE: change this ref to ghcr.io/<your-org>/<your-repo>:stable —
+# it must match the package that build-image.yml publishes, which is
+# ghcr.io/<repository_owner>/<repository_name>.
+bootc switch --mutate-in-place --transport registry ghcr.io/projectbluefin/finpilot:stable
 %end
 """
 

@@ -76,9 +76,9 @@ Update bootc switch URL to point to ghcr.io/username/repo
 ### Workflow Changes
 
 ```
-ci(workflow): enable automatic ISO builds
+ci(workflow): cache DNF metadata between image builds
 
-Configure build-disk.yml to trigger on main branch pushes
+Restore and save the DNF cache in build-image.yml, keyed on Containerfile
 ```
 
 ### Metadata Updates
