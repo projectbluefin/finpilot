@@ -6,9 +6,13 @@ on:
   pull_request:
     paths:
       - "custom/brew/**"
+      - "build/validate-brewfiles.sh"
+      - "tests/unit/validate-brewfiles_test.bats"
+      - ".github/workflows/validate-brewfiles.yml"
 jobs:
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -16,19 +20,24 @@ jobs:
       - name: Set up Homebrew
         uses: Homebrew/actions/setup-homebrew@f8d4222eb633e65c2a0157383cf80861fc7fae7f # master
 
+      - name: Install just
+        env:
+          # renovate: datasource=github-releases depName=casey/just
+          JUST_VERSION: "1.42.0"
+        run: |
+          set -euo pipefail
+          base="https://github.com/casey/just/releases/download/${JUST_VERSION}"
+          asset="just-${JUST_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+          curl -sSfL -o "${asset}" "${base}/${asset}"
+          curl -sSfL -o SHA256SUMS "${base}/SHA256SUMS"
+          grep -F "${asset}" SHA256SUMS | sha256sum -c -
+          tar xzf "${asset}" -C /tmp just
+          sudo install -m 0755 /tmp/just /usr/local/bin/just
+          just --version
+
+      # Static validation only: the recipe greps Brewfiles and passes names
+      # to `brew info` as data. Never `brew bundle check` a PR-controlled
+      # Brewfile — it is a Ruby DSL and would execute in CI (see #288).
       - name: Validate Brewfiles
         shell: bash
-        run: |
-          echo "Validating Brewfiles in custom/brew/ directory..."
-
-          find "custom/brew" -iname '*\.Brewfile*' -print0 | \
-            while IFS= read -r -d '' brewfile ; do
-              echo "::group:: ===$(basename "$brewfile")==="
-              if brew bundle check --file="$brewfile" 2>&1; then
-                echo "✓ $brewfile is valid"
-              else
-                echo "✗ $brewfile validation failed"
-                exit 1
-              fi
-              echo "::endgroup::"
-            done
+        run: just validate-brewfiles
