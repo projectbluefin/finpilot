@@ -35,6 +35,13 @@ test-unit:
     echo "Running unit tests..."
     bats tests/unit/
 
+# Validate Brewfiles without evaluating them as Ruby (see #288)
+[group('Just')]
+validate-brewfiles:
+    #!/usr/bin/bash
+    set -euo pipefail
+    bash build/validate-brewfiles.sh
+
 # Fix Just Syntax
 [group('Just')]
 fix:
