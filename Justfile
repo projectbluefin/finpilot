@@ -413,17 +413,42 @@ spawn-vm rebuild="0" type="qcow2" ram="6G":
       --vsock=false --pass-ssh-key=false \
       -i ./output/**/*.{{ type }}
 
-# Runs shell check on all Bash scripts
+# Expand .shellcheck-scope into the list of shell scripts under lint
+[private]
+shell-sources:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    shopt -s globstar nullglob
+    [[ -f .shellcheck-scope ]] || { echo ".shellcheck-scope is missing" >&2; exit 1; }
+    while IFS= read -r pattern || [[ -n "$pattern" ]]; do
+        pattern="${pattern%%#*}"
+        pattern="${pattern#"${pattern%%[![:space:]]*}"}"
+        pattern="${pattern%"${pattern##*[![:space:]]}"}"
+        [[ -z "$pattern" ]] && continue
+        for f in $pattern; do
+            [[ -f "$f" ]] && printf '%s\n' "$f"
+        done
+    done < .shellcheck-scope
+
+# Runs shell check on the scripts declared in .shellcheck-scope
 lint:
     #!/usr/bin/env bash
-    set -eoux pipefail
+    set -euo pipefail
     # Check if shellcheck is installed
     if ! command -v shellcheck &> /dev/null; then
         echo "shellcheck could not be found. Please install it."
         exit 1
     fi
-    # Run shellcheck on all Bash scripts
-    /usr/bin/find . -iname "*.sh" -type f -exec shellcheck "{}" ';'
+    # .shellcheck-scope is the single source of truth for lint scope; CI reads
+    # the same file into validate-pr's shellcheck-glob input (see #324).
+    mapfile -t sources < <(just shell-sources)
+    if [[ ${#sources[@]} -eq 0 ]]; then
+        echo "No shell scripts matched .shellcheck-scope" >&2
+        exit 1
+    fi
+    printf 'Shellchecking %s scripts:\n' "${#sources[@]}"
+    printf '  %s\n' "${sources[@]}"
+    shellcheck "${sources[@]}"
 
 # Runs shfmt on all Bash scripts
 format:
