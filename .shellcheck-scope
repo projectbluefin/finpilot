@@ -1,0 +1,20 @@
+# Single source of truth for "which shell scripts this repo lints".
+#
+# Consumers:
+#   - Justfile:lint                    (local `just lint`)
+#   - .github/workflows/pr-validation.yml SHOULD resolve this file into the
+#     `shellcheck-glob` input of projectbluefin/actions/bootc-build/validate-pr.
+#     That wiring is NOT yet in place: the hive GitHub App has no `workflows`
+#     permission, so a maintainer must apply it. Until then CI still lints the
+#     narrower hardcoded `build/*.sh` and `just lint` is the only consumer that
+#     honours this manifest. See #324 for the exact workflow patch.
+#   - tests/unit/shellcheck-scope_test.bats, which fails if a tracked *.sh
+#     file matches none of the patterns below
+#
+# One bash glob per line. Patterns are expanded from the repository root with
+# `shopt -s globstar nullglob`, so `**` crosses directories. Blank lines and
+# lines beginning with `#` are ignored.
+#
+# See #324.
+build/*.sh
+.github/actions/**/*.sh
