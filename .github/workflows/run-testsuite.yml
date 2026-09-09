@@ -1,0 +1,48 @@
+name: Run Testsuite
+
+# Canonical wrapper — always call this, never call projectbluefin/testsuite e2e.yml directly.
+# Uses @v1 managed tag — testsuite auto-tracks v1 to main on every merge via update-v1-tag.yml.
+# Never SHA-pin this ref; use @v1 so E2E picks up testsuite fixes immediately.
+on:
+  workflow_call:
+    inputs:
+      image:
+        description: "Full image reference to test (e.g. ghcr.io/projectbluefin/finpilot:testing)"
+        required: true
+        type: string
+      suites:
+        description: "Comma-separated list of test suites to run"
+        required: true
+        type: string
+  # Also dispatchable so advisory (non-gating) smoke runs can be fired from
+  # post-merge-e2e.yml and manually from the Actions UI against any image ref.
+  # The `inputs` context resolves for both workflow_call and workflow_dispatch.
+  workflow_dispatch:
+    inputs:
+      image:
+        description: "Full image reference to test (e.g. ghcr.io/projectbluefin/finpilot:testing)"
+        required: true
+        type: string
+      suites:
+        description: "Comma-separated list of test suites to run"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write # testsuite pushes screenshot OCI artifacts to GHCR
+
+jobs:
+  e2e:
+    name: ${{ inputs.suites }}
+    permissions:
+      contents: read
+      packages: write  # testsuite pushes screenshot OCI artifacts to GHCR
+    uses: projectbluefin/testsuite/.github/workflows/e2e.yml@v1
+    with:
+      image: ${{ inputs.image }}
+      suites: ${{ inputs.suites }}
+      # Keep the checked-out tests aligned with the managed workflow tag.
+      # Defaulting to testsuite/main can gate finpilot on unreleased test changes.
+      test_ref: v1
+    secrets: inherit

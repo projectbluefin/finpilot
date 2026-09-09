@@ -39,7 +39,13 @@ links lives in `.agents/skills/README.md`.
 
 The promotion release gate verifies cosign signatures on the `:testing` tag;
 keyless signing is enabled by default in `build-image.yml` ("Sign and publish"
-step) and reports `release/ready` once a signed `:testing` image exists.
+step) and reports `release/ready` once a signed `:testing` image exists. As of
+#284 the gate also requires a successful `Post-Merge E2E` run — digest and
+manifest verification dispatched by `build-image.yml` per main HEAD and
+backfilled by the promotion workflow — before reporting `release/ready`.
+Functional desktop smoke is advisory and opt-in (repository variable
+`E2E_ADVISORY_SMOKE=1`); making it blocking is pending the suite-selection
+decision in #281.
 
 ## CRITICAL: GitHub API Usage
 
