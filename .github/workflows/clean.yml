@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   delete-older-than-90:
-    runs-on: ubuntu-latest
+    runs-on: ghost-runners
     permissions:
       contents: read
       packages: write

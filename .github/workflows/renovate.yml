@@ -16,7 +16,7 @@ permissions: {}
 jobs:
   renovate:
     name: Renovate
-    runs-on: ubuntu-latest
+    runs-on: ghost-runners
     permissions:
       contents: read
     steps:

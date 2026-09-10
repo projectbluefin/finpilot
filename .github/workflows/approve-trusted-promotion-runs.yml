@@ -31,7 +31,7 @@ concurrency:
 
 jobs:
   approve:
-    runs-on: ubuntu-latest
+    runs-on: ghost-runners
     timeout-minutes: 5
     steps:
       - name: Approve pending runs on trusted promotion branches

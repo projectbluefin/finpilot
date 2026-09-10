@@ -15,7 +15,7 @@ permissions: {}
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: ghost-runners
     timeout-minutes: 10
     steps:
       - name: Checkout

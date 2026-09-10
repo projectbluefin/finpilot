@@ -11,7 +11,7 @@ on:
       - ".github/workflows/validate-brewfiles.yml"
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: ghost-runners
     timeout-minutes: 15
     steps:
       - name: Checkout
