@@ -30,8 +30,35 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # First-time forks have no `stable` branch. The factory reusable fetches
+  # origin/stable and fails with exit 128 ("couldn't find remote ref stable"),
+  # which opens "ci: testing→main promotion conflict". Create it once from
+  # current main; later runs no-op when the ref exists.
+  ensure-stable:
+    name: Ensure stable branch exists
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Create stable from main if missing
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin stable >/dev/null; then
+            echo "stable already exists"
+            exit 0
+          fi
+          git push origin "HEAD:stable"
+          echo "Created stable from ${GITHUB_SHA}"
+
   promote:
     name: Promote main to stable
+    needs: ensure-stable
     uses: projectbluefin/actions/.github/workflows/reusable-promote-squash.yml@e2ccd51b41d9bb3abd9caeac626fb15c95589c3c # v1
     with:
       variants: >-

@@ -28,7 +28,8 @@ Promotion is a squash PR from `main` to `stable` opened automatically by
 `.github/workflows/promote-main-to-stable.yml` (factory reusable workflow —
 no external GitHub App required).
 
-Create `stable` as an exact copy of `main`, then return to `main`:
+The promote workflow creates `stable` from `main` on its first run, so the
+manual step below is optional. To create it up front instead:
 
 ```bash
 git switch main

@@ -114,6 +114,10 @@ Monitor the workflow. A successful first build:
 - Publishes `:stable-testing` and `:testing` tags to GHCR (`stable` branch builds publish `:stable`)
 - Appears under **Packages** in your repository
 
+The `promote-main-to-stable.yml` workflow creates the `stable` branch from
+`main` on its first run, so a fresh fork does not need a manual `stable`
+branch to start promoting.
+
 ## README "What Makes this Raptor Different" Section
 
 **CRITICAL**: Add this section near the top of `README.md` (after the title/intro, before detailed docs):
