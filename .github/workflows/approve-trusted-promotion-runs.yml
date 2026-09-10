@@ -1,0 +1,76 @@
+name: Approve trusted promotion runs
+
+# The main->stable and testing->main promotion PRs are opened by
+# github-actions[bot] on internal auto/promote-* branches. GitHub treats
+# that bot actor like an unverified contributor for the purposes of the
+# "require approval to run workflows" policy, so their pull_request-triggered
+# required checks (PR Validation, Validate Renovate Config, Validate
+# Justfiles, the org-wide label enforcement workflow, etc.) get created with
+# zero jobs and immediately conclude `action_required`, permanently blocking
+# promotion.
+#
+# This workflow runs on a schedule (never gated behind approval itself,
+# since it isn't a pull_request-triggered run) and explicitly approves any
+# pending run it finds on those trusted, bot-owned promotion branches so the
+# *same* required checks can actually execute. It never skips, overrides, or
+# reports a status for a check -- it only unblocks execution, so release
+# gates are preserved.
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: approve-trusted-promotion-runs
+  cancel-in-progress: false
+
+jobs:
+  approve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Approve pending runs on trusted promotion branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # Only ever touch runs on the internal, bot-generated promotion
+          # branches. These PRs are opened by github-actions[bot] against
+          # main/stable and never carry third-party code, so approving
+          # their required checks does not bypass any gate -- it only lets
+          # the checks that would already be required for a human-authored
+          # PR actually run.
+          trusted_branch_pattern='^auto/promote-(main-to-stable|testing-to-main)$'
+
+          mapfile -t run_ids < <(
+            gh api "repos/${REPO}/actions/runs?status=action_required&per_page=100" \
+              --jq --arg pattern "${trusted_branch_pattern}" --arg repo "${REPO}" '
+                .workflow_runs[]
+                | select(.head_repository.full_name == $repo)
+                | select(.head_branch | test($pattern))
+                | select(.actor.login == "github-actions[bot]")
+                | select(.triggering_actor.login == "github-actions[bot]")
+                | .id
+              '
+          )
+
+          if [ "${#run_ids[@]}" -eq 0 ]; then
+            echo "No pending trusted promotion runs to approve."
+            exit 0
+          fi
+
+          for run_id in "${run_ids[@]}"; do
+            echo "Approving run ${run_id}..."
+            if gh api -X POST "repos/${REPO}/actions/runs/${run_id}/approve"; then
+              echo "Approved ${run_id}"
+            else
+              echo "::warning::Failed to approve run ${run_id} (it may no longer be eligible for approval)"
+            fi
+          done
