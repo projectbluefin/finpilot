@@ -3,7 +3,7 @@ name: enforce workflow labels
 on:
   issues:
     types: [opened, edited, labeled, unlabeled]
-  pull_request:
+  pull_request_target:
     types: [opened, reopened, synchronize, labeled, unlabeled]
 
 permissions:
