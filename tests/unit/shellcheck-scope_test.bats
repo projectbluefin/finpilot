@@ -86,21 +86,12 @@ tracked_shell_scripts() {
     [[ "$output" == *".github/actions/check-token-health/check_token_health.sh"* ]]
 }
 
-@test "the CI shellcheck-glob is still the known-narrow value (documents the open gap)" {
-    # pr-validation.yml cannot be edited by this change: the hive GitHub App
-    # has no `workflows` permission, so the CI half of #324 must be applied by
-    # a maintainer. This test pins the current value so the follow-up is not
-    # forgotten and so a *different* narrowing cannot slip in unnoticed.
-    #
-    # When a maintainer wires the workflow to .shellcheck-scope, replace this
-    # test with the assertion in the block comment below.
-    #
-    #   run grep -n 'shellcheck-glob' "${WORKFLOW}"
-    #   [ "$status" -eq 0 ]
-    #   [[ "$output" == *'steps.shell-scope.outputs.glob'* ]]
+@test "the CI shellcheck-glob resolves from .shellcheck-scope" {
+    # .github/workflows/pr-validation.yml resolves .shellcheck-scope into
+    # shellcheck-glob via the shell-scope step (see #324).
     run grep -n 'shellcheck-glob:' "${WORKFLOW}"
     [ "$status" -eq 0 ]
-    [[ "$output" == *'"build/*.sh"'* || "$output" == *'steps.shell-scope.outputs.glob'* ]]
+    [[ "$output" == *'steps.shell-scope.outputs.glob'* ]]
 }
 
 @test "Justfile:lint reads the manifest instead of walking the tree" {
