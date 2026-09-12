@@ -31,6 +31,18 @@ setup() {
     export PATH="${STUB_BIN}:${PATH}"
     export PODMAN_LOG SKOPEO_LOG
 
+    # Pin GITHUB_REPOSITORY_OWNER so the Justfile's REPO_ORG resolves to a
+    # known value regardless of the CI environment.  Without this, forks
+    # (where GITHUB_REPOSITORY_OWNER != "projectbluefin") would fail every
+    # assertion that checks the vendor / cache-ref strings.  See #352.
+    export GITHUB_REPOSITORY_OWNER="testorg"
+    EXPECTED_REPO_ORG="${GITHUB_REPOSITORY_OWNER}"
+
+    # Hermetic against the host/devcontainer environment: an exported
+    # GITHUB_TOKEN would make "does not add a build secret when unset" fail
+    # outside GitHub's runners, where the step never exports one.
+    unset GITHUB_TOKEN
+
     # Deterministic clock: the recipe builds the version string from `date`.
     export STUB_DATE_YMD="20260830"
     # Registry state the skopeo stub reports back for `list-tags`.
@@ -177,7 +189,7 @@ podman_build_args() {
     local args
     args="$(podman_build_args)"
     [[ "${args}" == *"--build-arg IMAGE_NAME=finpilot"* ]]
-    [[ "${args}" == *"--build-arg IMAGE_VENDOR=projectbluefin"* ]]
+    [[ "${args}" == *"--build-arg IMAGE_VENDOR=${EXPECTED_REPO_ORG}"* ]]
     [[ "${args}" == *"--build-arg UBLUE_IMAGE_TAG=stable"* ]]
 }
 
@@ -222,7 +234,7 @@ podman_build_args() {
     args="$(podman_build_args)"
     [[ "${args}" == *"--label org.opencontainers.image.title=finpilot"* ]]
     [[ "${args}" == *"--label org.opencontainers.image.version=44.20260830"* ]]
-    [[ "${args}" == *"--label org.opencontainers.image.vendor=projectbluefin"* ]]
+    [[ "${args}" == *"--label org.opencontainers.image.vendor=${EXPECTED_REPO_ORG}"* ]]
     [[ "${args}" == *"--label org.opencontainers.image.created=2026-08-30T00:00:00Z"* ]]
     [[ "${args}" == *"--label io.artifacthub.package.license=Apache-2.0"* ]]
     [[ "${args}" == *"--label containers.bootc=1"* ]]
@@ -233,14 +245,14 @@ podman_build_args() {
     [ "$status" -eq 0 ]
     local args
     args="$(podman_build_args)"
-    [[ "${args}" == *"--cache-from ghcr.io/projectbluefin/finpilot"* ]]
+    [[ "${args}" == *"--cache-from ghcr.io/${EXPECTED_REPO_ORG}/finpilot"* ]]
     [[ "${args}" != *"--cache-to"* ]]
 }
 
 @test "build: writes the layer cache when REGISTRY_CACHE_WRITE=1" {
     REGISTRY_CACHE_WRITE=1 run_just build finpilot stable
     [ "$status" -eq 0 ]
-    [[ "$(podman_build_args)" == *"--cache-to ghcr.io/projectbluefin/finpilot"* ]]
+    [[ "$(podman_build_args)" == *"--cache-to ghcr.io/${EXPECTED_REPO_ORG}/finpilot"* ]]
 }
 
 @test "build: skips cache args entirely when the cache ref is unreachable" {
