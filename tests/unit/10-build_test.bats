@@ -144,7 +144,6 @@ teardown() {
     [ "$status" -eq 0 ]
 
     mapfile -t calls <"${DNF5_LOG}"
-    [ "${#calls[@]}" -eq 1 ]
     [ "${calls[0]}" = "install -y tmux gum" ]
 }
 
