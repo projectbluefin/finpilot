@@ -32,7 +32,7 @@ concurrency:
 jobs:
   promote:
     name: Promote main to stable
-    uses: projectbluefin/actions/.github/workflows/reusable-promote-squash.yml@e2ccd51b41d9bb3abd9caeac626fb15c95589c3c # v1
+    uses: projectbluefin/actions/.github/workflows/reusable-promote-squash.yml@2564c7bb30143104a9a1aebb4254359e174a8d81 # v1
     with:
       variants: >-
         [{"image":"${{ github.event.repository.name }}"}]
@@ -44,5 +44,13 @@ jobs:
       # The release gate resolves the :testing tag (published by main builds)
       # and verifies its cosign signature. Enable the OPTIONAL keyless signing
       # step in build-image.yml for the gate to report release/ready.
+      #
+      # KNOWN GAP (see #281): run_e2e is false because finpilot has no
+      # post-build/post-merge E2E workflow and no e2e_image configured for
+      # the shared gate to exercise. Stable promotion is therefore gated on
+      # digest + cosign signature checks only, not on functional E2E
+      # validation. This is an intentional, documented release risk (see
+      # README.md "Promote to Stable") until an E2E workflow and
+      # `e2e_image`/`e2e_suites` inputs are added here.
       run_e2e: false
     secrets: inherit
