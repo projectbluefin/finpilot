@@ -38,6 +38,11 @@ setup() {
     export GITHUB_REPOSITORY_OWNER="testorg"
     EXPECTED_REPO_ORG="${GITHUB_REPOSITORY_OWNER}"
 
+    # Hermetic against the host/devcontainer environment: an exported
+    # GITHUB_TOKEN would make "does not add a build secret when unset" fail
+    # outside GitHub's runners, where the step never exports one.
+    unset GITHUB_TOKEN
+
     # Deterministic clock: the recipe builds the version string from `date`.
     export STUB_DATE_YMD="20260830"
     # Registry state the skopeo stub reports back for `list-tags`.
