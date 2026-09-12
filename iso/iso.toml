@@ -10,7 +10,7 @@ contents = """
 # After installation, switch to the custom image from this repository.
 # FORK NOTE: change this ref to ghcr.io/<your-org>/<your-repo>:stable —
 # it must match the package that build-image.yml publishes, which is
-# ghcr.io/proteanVoid/protean.
+# ghcr.io/proteanvoid/protean.
 bootc switch --mutate-in-place --transport registry ghcr.io/projectbluefin/finpilot:stable
 %end
 """
