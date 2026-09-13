@@ -5,11 +5,14 @@
 
 # Uncomment the apps you want installed on first boot:
 
-;[Flatpak Preinstall org.mozilla.firefox]
-;Branch=stable
+[Flatpak Preinstall org.mozilla.firefox]
+Branch=stable
 
 ;[Flatpak Preinstall org.mozilla.Thunderbird]
 ;Branch=stable
 
 ;[Flatpak Preinstall org.gnome.Calculator]
 ;Branch=stable
+
+[Flatpack Preinstall md.obsidian.Obsidian]
+Branch=stable

@@ -12,14 +12,14 @@
 # brew "azure-cli"      # Azure CLI
 
 # Programming languages and tools
-# brew "go"             # Go programming language
-# brew "node"           # Node.js
-# brew "python@3.12"    # Python
+brew "go"             # Go programming language
+brew "node"           # Node.js
+brew "python@3.12"    # Python
 # brew "rust"           # Rust programming language
 
 # Build tools
-# brew "cmake"          # Cross-platform build system
-# brew "ninja"          # Small build system
+brew "cmake"          # Cross-platform build system
+brew "ninja"          # Small build system
 
 # Debugging and profiling
 # brew "gdb"            # GNU debugger

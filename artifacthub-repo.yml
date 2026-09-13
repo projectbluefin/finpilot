@@ -2,7 +2,7 @@
 # Sign up and add the Repository ID to the right field. Owners fields are optional.
 # Examples: https://artifacthub.io/packages/search?ts_query_web=ublue&sort=relevance&page=1
 
-repositoryID: finpilot # TODO: Replace with your Artifact Hub repository ID (or delete this file if not publishing)
+repositoryID: protean # TODO: Replace with your Artifact Hub repository ID (or delete this file if not publishing)
 owners: # TODO: (optional, used to claim repository ownership on Artifact Hub)
   - name: TODO Your Name
     email: TODO your-email@example.com
