@@ -63,8 +63,6 @@ teardown() {
 }
 
 # A classic PAT response: GitHub returns rate-limit AND x-oauth-scopes headers.
-# Every header the script greps must be present, because `set -e` aborts the
-# script on the first grep that finds nothing (see the two skipped tests below).
 pat_headers() {
     printf 'HTTP/2 200\r\nx-ratelimit-limit: 5000\r\nx-ratelimit-remaining: 4999\r\nx-oauth-scopes: repo, workflow, read:org\r\n'
 }
@@ -160,7 +158,6 @@ pat_headers() {
 }
 
 @test "missing rate limit headers report unknown and still pass" {
-    skip "known defect #339: RATE_REMAINING=\$(grep ...) aborts under set -e when the header is absent"
     STUB_HEADERS="$(printf 'HTTP/2 200\r\n')"
     run bash "${SCRIPT}"
     [ "${status}" -eq 0 ]
@@ -234,7 +231,6 @@ pat_headers() {
 }
 
 @test "fine-grained token without a scopes header skips the scope check" {
-    skip "known defect #339: SCOPES=\$(grep ...) aborts under set -e, so the documented fine-grained/App-token branch is unreachable"
     REQUIRED_SCOPES="repo,workflow"
     STUB_HEADERS="$(printf 'HTTP/2 200\r\nx-ratelimit-limit: 5000\r\nx-ratelimit-remaining: 4999\r\n')"
     run bash "${SCRIPT}"
