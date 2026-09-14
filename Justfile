@@ -42,6 +42,13 @@ validate-brewfiles:
     set -euo pipefail
     bash build/validate-brewfiles.sh
 
+# Validate flatpak preinstall files against flathub (Branch= key + app existence)
+[group('Just')]
+validate-flatpaks:
+    #!/usr/bin/bash
+    set -euo pipefail
+    bash build/validate-flatpaks.sh
+
 # Fix Just Syntax
 [group('Just')]
 fix:

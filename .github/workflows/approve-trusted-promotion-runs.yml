@@ -51,10 +51,10 @@ jobs:
 
           mapfile -t run_ids < <(
             gh api "repos/${REPO}/actions/runs?status=action_required&per_page=100" \
-              | jq -r --arg pattern "${trusted_branch_pattern}" --arg repo "${REPO}" '
+              --jq --arg pattern "${trusted_branch_pattern}" --arg repo "${REPO}" '
                 .workflow_runs[]
                 | select(.head_repository.full_name == $repo)
-                | select((.head_branch // "") | test($pattern))
+                | select(.head_branch | test($pattern))
                 | select(.actor.login == "github-actions[bot]")
                 | select(.triggering_actor.login == "github-actions[bot]")
                 | .id
