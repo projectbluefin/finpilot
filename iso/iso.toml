@@ -11,7 +11,7 @@ contents = """
 # FORK NOTE: change this ref to ghcr.io/<your-org>/<your-repo>:stable —
 # it must match the package that build-image.yml publishes, which is
 # ghcr.io/<repository_owner>/<repository_name>.
-bootc switch --mutate-in-place --transport registry ghcr.io/projectbluefin/finpilot:stable
+bootc switch --mutate-in-place ostree-image-signed:docker://ghcr.io/projectbluefin/finpilot:stable # ponytail: signed transport (cosign/Fulcio/Rekor), matches 00-image-info.sh; drops unsigned --transport registry
 %end
 """
 
