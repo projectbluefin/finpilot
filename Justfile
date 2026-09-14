@@ -83,13 +83,16 @@ sudo-clean:
 sudoif command *args:
     #!/usr/bin/bash
     function sudoif(){
+        local sudo_bin
+        sudo_bin="$(command -v sudo || true)"
         if [[ "${UID}" -eq 0 ]]; then
             "$@"
-        elif [[ "$(command -v sudo)" && -n "${SSH_ASKPASS:-}" ]] && [[ -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLAY:-}" ]]; then
-            /usr/bin/sudo --askpass "$@" || exit 1
-        elif [[ "$(command -v sudo)" ]]; then
-            /usr/bin/sudo "$@" || exit 1
+        elif [[ -n "${sudo_bin}" ]] && [[ -n "${SSH_ASKPASS:-}" ]] && [[ -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLAY:-}" ]]; then
+            "${sudo_bin}" --askpass "$@" || exit 1
+        elif [[ -n "${sudo_bin}" ]]; then
+            "${sudo_bin}" "$@" || exit 1
         else
+            echo "sudoif: no sudo available and not running as root" >&2
             exit 1
         fi
     }
