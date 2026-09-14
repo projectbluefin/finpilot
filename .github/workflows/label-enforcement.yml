@@ -1,9 +1,16 @@
 name: enforce workflow labels
 
+# pull_request_target runs with a writable token in this (base) repo's
+# context, which is safe here only because the job never checks out the
+# fork's head -- it only reads issue/PR metadata through the API and writes
+# labels. If reusable-design-enforcement.yml is ever bumped to a version
+# that adds an actions/checkout of github.event.pull_request.head.sha, this
+# silently becomes an arbitrary-code-execution path. Confirm that pin does
+# not check out the PR head before bumping it.
 on:
   issues:
     types: [opened, edited, labeled, unlabeled]
-  pull_request:
+  pull_request_target:
     types: [opened, reopened, synchronize, labeled, unlabeled]
 
 permissions:
