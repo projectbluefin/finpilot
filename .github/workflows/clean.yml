@@ -31,7 +31,7 @@ jobs:
           echo "name=${name,,}" >> "${GITHUB_OUTPUT}"
 
       - name: Cleanup old images
-        uses: projectbluefin/actions/bootc-build/ghcr-cleanup@2564c7bb30143104a9a1aebb4254359e174a8d81 # v1
+        uses: projectbluefin/actions/bootc-build/ghcr-cleanup@6680f74bf167fa12f498db1c1e9e1183c0415bb9 # v1
         with:
           packages: ${{ steps.package.outputs.name }}
           older-than: 90 days
