@@ -15,7 +15,6 @@ set -euo pipefail
 #   BASE_IMAGE_NAME     - Base image name (e.g. silverblue)
 #   FEDORA_MAJOR_VERSION - Fedora version (e.g. 42)
 #   VERSION             - Full version string (e.g. stable-42.20250531)
-#   SHA_HEAD_SHORT      - Short git SHA (optional, for dev builds)
 ###############################################################################
 
 # Branding — customize these for your image

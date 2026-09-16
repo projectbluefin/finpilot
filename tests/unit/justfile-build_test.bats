@@ -158,19 +158,6 @@ podman_build_args() {
     [[ "$output" != *"Tag collision detected"* ]]
 }
 
-@test "build: stamps SHA_HEAD_SHORT only when the worktree is clean" {
-    run_just build finpilot stable
-    [ "$status" -eq 0 ]
-    [[ "$(podman_build_args)" == *"--build-arg SHA_HEAD_SHORT=abc1234"* ]]
-}
-
-@test "build: omits SHA_HEAD_SHORT when the worktree is dirty" {
-    export STUB_GIT_STATUS=" M Containerfile"
-    run_just build finpilot stable
-    [ "$status" -eq 0 ]
-    [[ "$(podman_build_args)" != *"SHA_HEAD_SHORT"* ]]
-}
-
 @test "build: passes the image identity build args bootc relies on" {
     run_just build finpilot stable
     [ "$status" -eq 0 ]
