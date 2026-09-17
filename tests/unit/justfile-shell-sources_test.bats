@@ -129,9 +129,10 @@ EOF
 
 @test "shell-sources trims leading and trailing whitespace from a pattern" {
     make_scripts a.sh
-    write_scope <<'EOF'
-   a.sh	
-EOF
+    # Built with printf, not a heredoc: a literal trailing tab in this file
+    # would be stripped by the trailing-whitespace pre-commit hook, silently
+    # deleting the very thing this test asserts is trimmed.
+    printf '   a.sh\t\n' | write_scope
 
     run_just shell-sources
 
