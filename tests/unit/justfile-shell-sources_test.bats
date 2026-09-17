@@ -62,8 +62,22 @@ make_scripts() {
 run_just() {
     local err_log="${TEST_ROOT}/stderr.log"
     : >"${err_log}"
-    run bash -c "cd '${SANDBOX}' && just $* 2>'${err_log}'"
+    run env PATH="${JUST_PATH:-${PATH}}" \
+        bash -c "cd '${SANDBOX}' && just $* 2>'${err_log}'"
     stderr="$(cat "${err_log}")"
+}
+
+# Build a PATH that holds only the interpreters the recipes need, so a tool the
+# recipe probes for with `command -v` is genuinely absent. Deleting a stub is
+# not enough: CI runners ship a real shellcheck further along PATH.
+minimal_path_without() {
+    local missing="$1" tool bin="${TEST_ROOT}/minimal-bin"
+    mkdir -p "${bin}"
+    for tool in bash just; do
+        [[ "${tool}" == "${missing}" ]] && continue
+        ln -sf "$(command -v "${tool}")" "${bin}/${tool}"
+    done
+    printf '%s\n' "${bin}"
 }
 
 @test "shell-sources expands declared globs into the matching files" {
@@ -274,6 +288,7 @@ EOF
 a.sh
 EOF
     rm -f "${STUB_BIN}/shellcheck"
+    JUST_PATH="$(minimal_path_without shellcheck)"
 
     run_just lint
 
