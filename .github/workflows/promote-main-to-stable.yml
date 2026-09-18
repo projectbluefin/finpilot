@@ -37,7 +37,7 @@ jobs:
       variants: >-
         [{"image":"${{ github.event.repository.name }}"}]
       cosign_identity_regexp: >-
-        ^https://github\.com/${{ github.repository_owner }}/[^/]+/\.github/workflows/
+        ^https://github\.com/${{ github.repository }}/\.github/workflows/
       registry: ghcr.io/${{ github.repository_owner }}
       source_branch: main
       target_branch: stable
