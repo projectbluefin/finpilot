@@ -312,7 +312,11 @@ _build-bib $target_image $tag $type $config: (_rootful_load_image target_image t
     mkdir -p output
     sudo mv -f $BUILDTMP/* output/
     sudo rmdir $BUILDTMP
-    sudo chown -R $USER:$USER output/
+    # ponytail: resolve ownership from the kernel, not $USER. $USER is unset in
+    # container/cron/systemd/env -i shells, so under `set -u` the recipe aborted
+    # here after the build finished and left output/ root-owned. Numeric ids are
+    # what chown resolves to anyway, so this is behavior-preserving interactively.
+    sudo chown -R "$(id -u):$(id -g)" output/
 
 # Podman builds the image from the Containerfile and creates a bootable image
 # Parameters:
