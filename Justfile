@@ -151,9 +151,6 @@ build $target_image=IMAGE_NAME $tag=DEFAULT_TAG:
 
     BUILD_ARGS=()
     BUILD_ARGS+=("--build-arg" "VERSION=${ver}")
-    if [[ -z "$(git status -s)" ]]; then
-        BUILD_ARGS+=("--build-arg" "SHA_HEAD_SHORT=$(git rev-parse --short HEAD)")
-    fi
 
     # Image identity ARGs - these define how bootc/ublue ecosystem recognizes the image
     # Override via env vars: IMAGE_NAME, IMAGE_VENDOR, UBLUE_IMAGE_TAG

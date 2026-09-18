@@ -37,8 +37,6 @@ setup() {
     export STUB_SKOPEO_TAGS='{"Tags":[]}'
     # Exit status of `skopeo list-tags`; non-zero disables the layer cache.
     export STUB_SKOPEO_STATUS=0
-    # Porcelain output of `git status -s`; empty means a clean worktree.
-    export STUB_GIT_STATUS=""
     # JSON `podman inspect` returns; the recipe reads .[].Id out of it.
     export STUB_PODMAN_INSPECT='[{"Id":"sha256:deadbeef"}]'
 
@@ -59,15 +57,6 @@ if [[ "${STUB_SKOPEO_STATUS:-0}" -ne 0 ]]; then
     exit "${STUB_SKOPEO_STATUS}"
 fi
 printf '%s\n' "${STUB_SKOPEO_TAGS}"
-EOF
-
-    cat >"${STUB_BIN}/git" <<'EOF'
-#!/usr/bin/env bash
-case "$1" in
-    status) printf '%s' "${STUB_GIT_STATUS:-}" ;;
-    rev-parse) printf '%s\n' "abc1234" ;;
-esac
-exit 0
 EOF
 
     cat >"${STUB_BIN}/date" <<'EOF'
@@ -156,19 +145,6 @@ podman_build_args() {
     [ "$status" -eq 0 ]
     [[ "$(podman_build_args)" == *"--build-arg VERSION=44.20260830"* ]]
     [[ "$output" != *"Tag collision detected"* ]]
-}
-
-@test "build: stamps SHA_HEAD_SHORT only when the worktree is clean" {
-    run_just build finpilot stable
-    [ "$status" -eq 0 ]
-    [[ "$(podman_build_args)" == *"--build-arg SHA_HEAD_SHORT=abc1234"* ]]
-}
-
-@test "build: omits SHA_HEAD_SHORT when the worktree is dirty" {
-    export STUB_GIT_STATUS=" M Containerfile"
-    run_just build finpilot stable
-    [ "$status" -eq 0 ]
-    [[ "$(podman_build_args)" != *"SHA_HEAD_SHORT"* ]]
 }
 
 @test "build: passes the image identity build args bootc relies on" {
