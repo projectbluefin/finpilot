@@ -13,8 +13,8 @@ repos:
   # Brewfile validation has exactly one implementation: build/validate-brewfiles.sh.
   # This hook must stay a caller of that script and must never hand a repository
   # Brewfile to `brew bundle` / `brew bundle check` -- Brewfiles are a Ruby DSL,
-  # so evaluating a PR-controlled one is code execution in CI (see #288, #323).
-  # tests/unit/precommit-brewfile-hook_test.bats enforces this.
+  # so evaluating a PR-controlled one is code execution in CI.
+  # tests/template/precommit-brewfile-hook_test.bats enforces this.
   - repo: local
     hooks:
       - id: validate-brewfiles

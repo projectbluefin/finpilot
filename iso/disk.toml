@@ -1,3 +1,7 @@
+# Partitioning for `just build-qcow2` and `just build-raw`. The root grows to
+# this size or twice the base container, whichever is larger. With a btrfs
+# rootfs only `/` and `/boot` are configurable.
+
 [[customizations.filesystem]]
 mountpoint = "/"
 minsize = "20 GiB"

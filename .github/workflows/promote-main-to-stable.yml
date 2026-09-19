@@ -1,10 +1,11 @@
 ---
 name: Promote main to stable
 
-# Two-branch model: `main` is the testing branch (publishes :stable-testing),
-# `stable` is the production branch (publishes :stable). On every push to
-# `main` the shared factory workflow opens (or refreshes) a squash promotion
-# PR from `main` to `stable`; merging it publishes :stable.
+# Two-branch model: `main` is the testing branch (publishes :stable-testing and
+# :testing); `stable` is the production branch. The shared factory workflow
+# opens (or refreshes) a squash promotion PR from `main` to `stable` daily, or
+# when a maintainer dispatches it. Merging that PR triggers digest promotion in
+# execute-release.yml; it does not rebuild `:stable`.
 #
 # Reusable logic lives in projectbluefin/actions — this is a thin caller,
 # matching the pattern in projectbluefin/bluefin and projectbluefin/bluefin-lts.
@@ -12,13 +13,16 @@ name: Promote main to stable
 # org-maintained, and shared with the other image repos (see issues #235/#237).
 
 on:
-  push:
-    branches:
-      - main
+  schedule:
+    # Default daily promotion window. Fork owners may change this cadence.
+    - cron: "0 4 * * *"
   workflow_dispatch:
 
 permissions:
-  actions: read
+  # unblock-promotion-checks needs write to approve the check runs GitHub holds
+  # for a bot-authored pull request. The reusable's jobs each declare their own
+  # permissions, so widening the ceiling does not hand actions: write to them.
+  actions: write
   contents: write
   issues: write
   packages: read
@@ -32,7 +36,7 @@ concurrency:
 jobs:
   promote:
     name: Promote main to stable
-    uses: projectbluefin/actions/.github/workflows/reusable-promote-squash.yml@2564c7bb30143104a9a1aebb4254359e174a8d81 # v1
+    uses: projectbluefin/actions/.github/workflows/reusable-promote-squash.yml@ce1d0c6bb5baf8bab3a5b226e693c9fd26b3c4a8 # v1
     with:
       variants: >-
         [{"image":"${{ github.event.repository.name }}"}]
@@ -41,16 +45,206 @@ jobs:
       registry: ghcr.io/${{ github.repository_owner }}
       source_branch: main
       target_branch: stable
-      # The release gate resolves the :testing tag (published by main builds)
-      # and verifies its cosign signature. Enable the OPTIONAL keyless signing
-      # step in build-image.yml for the gate to report release/ready.
+      # A personal image runs no e2e suites. The gate job below verifies the
+      # current candidate's cosign signature before a human merges; the tree
+      # guard in execute-release.yml is what binds the promotion to the commit
+      # the PR was built from.
+      run_e2e: false
+      # The only path that auto-enrolls the PR is a merge queue, which needs an
+      # organization-owned repository. Personal-account forks cannot use one.
+      use_merge_queue: false
+      # Enrolling without a merge queue runs `gh pr merge --auto` with no merge
+      # method, and GitHub CLI refuses that without a TTY ("--merge, --rebase,
+      # or --squash required when not running interactively"). The reusable
+      # exposes no merge-method input, so enrollment stays off and the promotion
+      # PR is merged by hand.
       #
-      # KNOWN GAP (see #281): run_e2e is false because finpilot has no
-      # post-build/post-merge E2E workflow and no e2e_image configured for
-      # the shared gate to exercise. Stable promotion is therefore gated on
-      # digest + cosign signature checks only, not on functional E2E
-      # validation. This is an intentional, documented release risk (see
-      # README.md "Promote to Stable") until an E2E workflow and
-      # `e2e_image`/`e2e_suites` inputs are added here.
+      # Merging by hand matters beyond the merge method. A merge performed as
+      # github-actions creates no workflow runs — a push made with that token is
+      # exempt only for workflow_dispatch and repository_dispatch — so the
+      # push-triggered execute-release.yml and sync-stable-to-main.yml never
+      # fire for it and the release becomes a manual dispatch. A merge performed
+      # by a person fires both, which is why this PR is merged in the UI rather
+      # than by a bot.
+      enqueue_promotion: false
+      # Personal-account forks do not have an <owner>/maintainers team.
+      # Organization forks can enable this and optionally set `reviewer`.
+      request_reviewer: false
+    secrets: inherit
+
+  # The reusable rebuilds the promotion branch by overlaying main's tree on
+  # stable, then staging the paths git reports as deletions. Git reports a moved
+  # file as a rename, so every path main moved survives on its old path and the
+  # branch's tree stops matching main's — which execute-release.yml's tree guard
+  # then refuses after the merge. Repair it here, before a human merges the PR: a
+  # commit carrying main's tree on top of stable, the shape the reusable intends.
+  # Skipped when the tree already matches, so a correct branch never loses its
+  # approvals to a no-op force-push.
+  repair-promotion-branch:
+    name: Make the promotion branch match main
+    needs: [promote]
+    if: needs.promote.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      PROMOTION_BRANCH: auto/promote-main-to-stable
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Rebuild the branch when its tree has drifted from main
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git fetch origin "${PROMOTION_BRANCH}" main stable
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Repair the branch the reusable built. A missing branch means there
+          # was nothing to promote, so there is nothing to repair.
+          if ! git rev-parse --verify --quiet "origin/${PROMOTION_BRANCH}" >/dev/null; then
+            echo "::notice::No ${PROMOTION_BRANCH} to repair."
+            exit 0
+          fi
+
+          head_tree=$(git rev-parse "origin/${PROMOTION_BRANCH}^{tree}")
+          main_tree=$(git rev-parse "origin/main^{tree}")
+          if [ "${head_tree}" = "${main_tree}" ]; then
+            echo "::notice::${PROMOTION_BRANCH} already matches main."
+            exit 0
+          fi
+
+          commit=$(git commit-tree "${main_tree}" -p origin/stable -m "chore: promote main to stable")
+          git push --force origin "${commit}:refs/heads/${PROMOTION_BRANCH}"
+          echo "Rebuilt ${PROMOTION_BRANCH} from main's tree."
+
+  # The reusable declares no workflow-level outputs, so the promotion PR is
+  # found by its deterministic head/base pair: reusable-promote-squash derives
+  # auto/promote-<source>-to-<target> from the branch-model inputs. A no-op run,
+  # where main and stable already match, has no PR at all. Two jobs need the
+  # number — the approver below and the gate — so look it up once.
+  locate-promotion-pr:
+    name: Locate the promotion PR
+    needs: [promote, repair-promotion-branch]
+    if: needs.promote.result == 'success' && needs.repair-promotion-branch.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read
+    outputs:
+      pr_number: ${{ steps.find.outputs.pr_number }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PROMOTION_BRANCH: auto/promote-main-to-stable
+    steps:
+      - name: Find the open promotion PR
+        id: find
+        shell: bash
+        run: |
+          set -euo pipefail
+          PR_NUMBER=$(gh pr list \
+            --repo "${{ github.repository }}" \
+            --base stable \
+            --head "${PROMOTION_BRANCH}" \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')
+          echo "pr_number=${PR_NUMBER}" >> "${GITHUB_OUTPUT}"
+          if [ -z "${PR_NUMBER}" ]; then
+            echo "::notice::No open promotion PR."
+          fi
+
+  # GitHub holds every check run it creates for a bot-authored pull request in
+  # `action_required` until someone approves it, so the promotion PR's own
+  # validation reports nothing until then. Without the approval the checks
+  # effectively never run — and GitHub throttles scheduled unblocking workflows
+  # to hours — so this job approves them seconds after the branch is pushed. If
+  # one is ever missed, approve it from the run's page.
+  unblock-promotion-checks:
+    name: Unblock the promotion PR's checks
+    needs: [locate-promotion-pr]
+    if: needs.locate-promotion-pr.outputs.pr_number != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PROMOTION_BRANCH: auto/promote-main-to-stable
+    steps:
+      - name: Approve pending runs on the promotion branch
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # The same trust boundary the scheduled approver documents: only runs
+          # on the bot-owned promotion branch, from the bot itself. Those
+          # branches carry only commits that already passed their own PR checks.
+          runs_filter=".workflow_runs[] | select(.head_branch == \"${PROMOTION_BRANCH}\") | select(.actor.login == \"github-actions[bot]\") | .id"
+
+          approved=0
+          # Runs for a freshly pushed branch appear a few seconds after the
+          # push, so retry briefly instead of reporting nothing to do.
+          for attempt in 1 2 3 4 5 6; do
+            mapfile -t run_ids < <(
+              gh api "repos/${{ github.repository }}/actions/runs?status=action_required&per_page=100" \
+                --jq "${runs_filter}"
+            )
+
+            if [ "${#run_ids[@]}" -gt 0 ]; then
+              for run_id in "${run_ids[@]}"; do
+                if gh api -X POST "repos/${{ github.repository }}/actions/runs/${run_id}/approve" >/dev/null; then
+                  echo "Approved run ${run_id}"
+                  approved=$((approved + 1))
+                else
+                  echo "::warning::Could not approve run ${run_id}"
+                fi
+              done
+              break
+            fi
+
+            if [ "${attempt}" -lt 6 ]; then
+              sleep 15
+            fi
+          done
+
+          if [ "${approved}" -eq 0 ]; then
+            echo "::notice::No pending runs matched; the scheduled approver remains the backstop."
+          fi
+
+  # The reusable's own release gate sits behind `enqueue_promotion`, which is off
+  # because a personal repository cannot enroll a promotion for merge. That input
+  # is a master switch for both the gate and the enrollment job, so turning
+  # enrollment off turned the gate off too. Run the same gate here, so the
+  # promotion PR is still verified and labelled before a human merges it.
+  gate:
+    name: Release gate checks
+    needs: [locate-promotion-pr]
+    if: needs.locate-promotion-pr.outputs.pr_number != ''
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+      packages: read
+      pull-requests: write
+    uses: projectbluefin/actions/.github/workflows/reusable-release-gate.yml@ce1d0c6bb5baf8bab3a5b226e693c9fd26b3c4a8 # v1
+    with:
+      repo: ${{ github.repository }}
+      pr_number: ${{ needs.locate-promotion-pr.outputs.pr_number }}
+      registry: ghcr.io/${{ github.repository_owner }}
+      variants: >-
+        [{"image":"${{ github.event.repository.name }}"}]
+      cosign_identity_regexp: >-
+        ^https://github\.com/${{ github.repository_owner }}/[^/]+/\.github/workflows/
+      target_tag: testing
+      # head_sha and the e2e_* inputs are deliberately omitted: they feed only
+      # the commit-bound E2E check, which run_e2e: false disables. Add them if
+      # e2e is ever enabled for this image.
       run_e2e: false
     secrets: inherit

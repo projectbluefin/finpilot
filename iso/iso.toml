@@ -1,31 +1,20 @@
-# Anaconda ISO Installer Configuration
-# This configuration creates a bootable ISO image for installing your custom bootc image.
-#
-# The installer will guide users through disk partitioning and basic system setup,
-# then automatically switch to your custom image on first boot.
+# Interactive install. bootc-image-builder injects clearpart --all,
+# autopart --nohome and reboot --eject when there is no kickstart table, which
+# erases the first disk without asking, so the table below must stay.
+# Nothing here sets a disk layout, locale, user or timezone value: Anaconda asks.
+# The image reference is not here either; the Justfile reads it from the image's
+# image-info.json.
 
 [customizations.installer.kickstart]
 contents = """
-%post
-# After installation, switch to the custom image from this repository.
-# FORK NOTE: change this ref to ghcr.io/<your-org>/<your-repo>:stable —
-# it must match the package that build-image.yml publishes, which is
-# ghcr.io/<repository_owner>/<repository_name>.
-bootc switch --mutate-in-place --transport registry ghcr.io/projectbluefin/finpilot:stable
-%end
+# Interactive install. bootc-image-builder supplies the ostreecontainer payload
+# line and the bootc origin; everything else is chosen in Anaconda's interface.
 """
 
 [customizations.installer.modules]
-# Enable standard Anaconda installer modules for a guided installation experience
+# Only entries that differ from bootc-image-builder's own defaults.
 enable = [
-  "org.fedoraproject.Anaconda.Modules.Storage", # Disk partitioning and formatting
-  "org.fedoraproject.Anaconda.Modules.Runtime", # Basic runtime configuration
-  "org.fedoraproject.Anaconda.Modules.Network", # Network configuration
-  "org.fedoraproject.Anaconda.Modules.Security", # Security settings
-  "org.fedoraproject.Anaconda.Modules.Services", # System services
-  "org.fedoraproject.Anaconda.Modules.Users", # User account creation
-  "org.fedoraproject.Anaconda.Modules.Timezone", # Timezone selection
+  "org.fedoraproject.Anaconda.Modules.Timezone",
 ]
-
-# Disable subscription management (not needed for community images)
+# A community image has no subscription to manage.
 disable = ["org.fedoraproject.Anaconda.Modules.Subscription"]

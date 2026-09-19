@@ -3,6 +3,10 @@
 # the host beyond adding the flathub remote (--user, --if-not-exists).
 #
 # Contract enforced per app:
+#   - every line must be a blank line, a '#' comment, a [Flatpak Preinstall
+#     <app-id>] header, or a key=value pair, which is the shape GKeyFile
+#     accepts; flatpak logs anything else at g_info level and then discards the
+#     whole file, so malformed syntax looks identical to an empty list
 #   - every [Flatpak Preinstall <app-id>] section must declare a Branch= key
 #   - every declared app-id must resolve on the flathub remote
 #
@@ -42,6 +46,30 @@ main() (
     checked=0
     for preinstall in "${preinstalls[@]}"; do
         printf '\nPreinstall: %s\n' "${preinstall}"
+
+        # Syntax pass. flatpak parses these files with GKeyFile and, on a
+        # malformed line, logs the error at g_info level and carries on with an
+        # empty keyfile (common/flatpak-dir.c), so one stray line silently
+        # reduces the whole list to a no-op. Groups are matched by prefix and
+        # any other name is skipped at the same level, so a header that is not
+        # exactly [Flatpak Preinstall <app-id>] drops that app just as quietly.
+        line_number=0
+        in_group=0
+        while IFS= read -r line || [[ -n "${line}" ]]; do
+            line_number=$((line_number + 1))
+            if [[ -z "${line}" || "${line}" == "#"* ]]; then
+                continue
+            elif [[ "${line}" =~ ^\[Flatpak\ Preinstall\ [A-Za-z0-9._-]+\]$ ]]; then
+                in_group=1
+                continue
+            elif [[ "${in_group}" -eq 1 && "${line}" != "["* && "${line}" == *"="* ]]; then
+                continue
+            fi
+            failed=$((failed + 1))
+            printf 'FAIL: %s:%s: not a # comment, a [Flatpak Preinstall <app-id>] header, or a key=value pair: %s\n' \
+                "${preinstall}" "${line_number}" "${line}" >&2
+        done < "${preinstall}"
+
         while IFS= read -r app_id; do
             branch=$(awk -v app="${app_id}" '
                 $0 == "[Flatpak Preinstall " app "]" {found=1; next}

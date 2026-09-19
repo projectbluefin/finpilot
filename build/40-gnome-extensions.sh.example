@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+###############################################################################
+# Example: GNOME Shell extensions
+###############################################################################
+# Installs GNOME Shell extensions system-wide and enables them for every user,
+# including users created after the image was built.
+#
+# Each extension is unpacked into /usr/share/gnome-shell/extensions/<uuid>/,
+# where the directory name has to be the uuid the extension declares in its
+# metadata.json. Enabling happens through the org.gnome.shell enabled-extensions
+# schema default, which is how Bluefin enables its own set. A user who has
+# already chosen extensions in dconf keeps that choice.
+#
+# To turn it on:
+#   1. mv build/40-gnome-extensions.sh.example build/40-gnome-extensions.sh
+#   2. Copy the RUN block for 40-gnome-extensions.sh from build/README.md into
+#      the Containerfile, after the 20-packages-and-services.sh block.
+#   3. Add the extensions you want to the lists in sections 1 and 2.
+###############################################################################
+
+# The shell major version is what extensions.gnome.org knows about (50.4 -> 50).
+SHELL_MAJOR="$(gnome-shell --version | awk '{print $3}' | cut -d. -f1)"
+EXTENSIONS_DIR=/usr/share/gnome-shell/extensions
+OVERRIDE_FILE=/usr/share/glib-2.0/schemas/zz1-custom-extensions.gschema.override
+
+# Every uuid installed below. Used in section 3 to build the enable list, so it
+# never has to be kept in sync by hand.
+INSTALLED_EXTENSIONS=()
+
+###############################################################################
+# 1. From extensions.gnome.org
+###############################################################################
+# One line per extension, by uuid. Any uuid from https://extensions.gnome.org
+# works; the site does not check packages against your shell version, so pick
+# ones whose pages list this GNOME release.
+
+EGO_EXTENSIONS=(
+	caffeine@patapon.info
+	blur-my-shell@aunetx
+)
+
+for uuid in "${EGO_EXTENSIONS[@]}"; do
+	info_url="https://extensions.gnome.org/extension-info/?uuid=${uuid}&shell_version=${SHELL_MAJOR}"
+	download_path="$(curl -fsSL "${info_url}" | jq -r .download_url)"
+
+	mkdir -p "${EXTENSIONS_DIR}/${uuid}"
+	curl -fsSL "https://extensions.gnome.org${download_path}" -o /tmp/extension.zip
+	unzip -q -o /tmp/extension.zip -d "${EXTENSIONS_DIR}/${uuid}"
+	rm -f /tmp/extension.zip
+
+	INSTALLED_EXTENSIONS+=("${uuid}")
+done
+
+###############################################################################
+# 2. From a GitHub repository
+###############################################################################
+# One line per extension, for projects that publish sources instead of a release
+# archive, such as bluefin-bling. Each line is the repository and the path to
+# one extension inside it. All entries come from the same branch.
+
+GITHUB_BRANCH="main"
+
+GITHUB_EXTENSIONS=(
+	"projectbluefin/bluefin-bling extensions/power-status-color"
+	"projectbluefin/bluefin-bling extensions/syncthing-toggle"
+)
+
+for entry in "${GITHUB_EXTENSIONS[@]}"; do
+	read -r repository path <<<"${entry}"
+
+	work_dir="$(mktemp -d)"
+	curl -fsSL "https://codeload.github.com/${repository}/tar.gz/refs/heads/${GITHUB_BRANCH}" |
+		tar -xz -C "${work_dir}"
+
+	# The archive root is <repository>-<branch>. Reading the uuid from the
+	# extension keeps the install directory in step with its metadata.json.
+	source_dir="${work_dir}/${repository#*/}-${GITHUB_BRANCH}/${path}"
+	uuid="$(jq -r .uuid "${source_dir}/metadata.json")"
+	mkdir -p "${EXTENSIONS_DIR}/${uuid}"
+	cp -a "${source_dir}/." "${EXTENSIONS_DIR}/${uuid}/"
+	rm -rf "${work_dir}"
+
+	INSTALLED_EXTENSIONS+=("${uuid}")
+done
+
+###############################################################################
+# 3. Enable them
+###############################################################################
+
+# Extensions ship schema XML, never a compiled cache, and some ship no schemas.
+shopt -s nullglob
+for schemas_dir in "${EXTENSIONS_DIR}"/*/schemas; do
+	glib-compile-schemas --strict "${schemas_dir}"
+done
+shopt -u nullglob
+
+# enabled-extensions is a single array, so this list replaces the default the
+# base image ships. Fedora's background-logo entry is kept, then everything
+# installed above is appended.
+ENABLED_LIST="'background-logo@fedorahosted.org'"
+for uuid in "${INSTALLED_EXTENSIONS[@]}"; do
+	ENABLED_LIST+=", '${uuid}'"
+done
+
+{
+	echo "[org.gnome.shell]"
+	echo "enabled-extensions=[${ENABLED_LIST}]"
+} >"${OVERRIDE_FILE}"
+
+# Rebuild the system schema cache so the override takes effect.
+rm -f /usr/share/glib-2.0/schemas/gschemas.compiled
+glib-compile-schemas /usr/share/glib-2.0/schemas

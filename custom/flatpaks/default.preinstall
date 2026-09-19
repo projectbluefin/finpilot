@@ -1,15 +1,32 @@
-# Default Flatpak applications
-# These will be installed on first boot
-# Format: INI file with [Flatpak Preinstall NAME] groups
+# Flatpak applications installed on first boot.
+#
+# Format: an INI file read by `flatpak preinstall`, one section per app:
+#
+#   [Flatpak Preinstall APP_ID]
+#   Branch=stable
+#
+# Comments must start with '#'; the parser is GKeyFile, so a ';' line is a
+# syntax error, and flatpak discards the entire file when one line is malformed.
 # See: https://docs.flatpak.org/en/latest/flatpak-command-reference.html#flatpak-preinstall
+#
+# App IDs are listed at https://flathub.org/ and verified by
+# `just validate-flatpaks` before a change can land.
 
-# Uncomment the apps you want installed on first boot:
+# Email, calendar and newsgroup client. Fedora ships no mail client by default.
+[Flatpak Preinstall org.mozilla.Thunderbird]
+Branch=stable
 
-;[Flatpak Preinstall org.mozilla.firefox]
-;Branch=stable
+# Audit and restrict the permissions of installed Flatpaks. There is no RPM
+# equivalent, so this only makes sense as a Flatpak.
+[Flatpak Preinstall com.github.tchx84.Flatseal]
+Branch=stable
 
-;[Flatpak Preinstall org.mozilla.Thunderbird]
-;Branch=stable
+# Browse and install GNOME Shell extensions. The packaged gnome-extensions-app
+# can only configure extensions that are already installed.
+[Flatpak Preinstall com.mattjakeman.ExtensionManager]
+Branch=stable
 
-;[Flatpak Preinstall org.gnome.Calculator]
-;Branch=stable
+# Add another by appending a section, for example:
+#
+# [Flatpak Preinstall io.github.flattool.Warehouse]
+# Branch=stable

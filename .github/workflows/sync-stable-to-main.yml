@@ -13,6 +13,9 @@ on:
   push:
     branches:
       - stable
+  # Normally a no-op. Dispatch it to force the sync after repairing the branch
+  # model by hand.
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -24,7 +27,7 @@ concurrency:
 jobs:
   sync:
     name: Keep main up-to-date with stable
-    uses: projectbluefin/actions/.github/workflows/reusable-sync-branches.yml@2564c7bb30143104a9a1aebb4254359e174a8d81 # v1
+    uses: projectbluefin/actions/.github/workflows/reusable-sync-branches.yml@ce1d0c6bb5baf8bab3a5b226e693c9fd26b3c4a8 # v1
     permissions:
       contents: write
     with:
