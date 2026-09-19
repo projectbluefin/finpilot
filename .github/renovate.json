@@ -27,34 +27,33 @@
   ],
   "packageRules": [
     {
-      "description": "Automerge safe low-risk updates (digest/pin only) when checks pass",
-      "matchUpdateTypes": ["digest", "pin", "pinDigest"],
+      "description": "Automerge everything short of a major when checks pass. PR checks are shellcheck + hadolint and PR builds are disabled, so this merges without an image build ever having run — the deliberate trade for zero dependency toil.",
+      "matchUpdateTypes": ["digest", "pin", "pinDigest", "patch", "minor"],
       "automerge": true,
       "automergeType": "pr",
       "automergeStrategy": "squash"
     },
     {
-      "description": "Keep the shared projectbluefin actions channel fresh (human review required — executable CI code)",
-      "matchPackageNames": ["projectbluefin/actions"],
-      "matchUpdateTypes": ["digest", "pinDigest", "pin", "patch", "minor"],
+      "description": "Keep first-party and base OCI images fresh immediately. The base namespaces are the three the Containerfile documents: Fedora, CentOS and Hummingbird.",
+      "matchDepNames": [
+        "ghcr.io/projectbluefin/common",
+        "ghcr.io/ublue-os/brew",
+        "quay.io/fedora-ostree-desktops/*",
+        "quay.io/centos-bootc/*",
+        "quay.io/hummingbird-community/*"
+      ],
+      "matchUpdateTypes": ["digest", "pinDigest", "pin"],
+      "automerge": true
+    },
+    {
+      "description": "Hold the build runner at Ubuntu 24.04: projectbluefin/actions' setup-runner asserts ubuntu-24.04 when adding its resolute apt source, so 26.04 fails the build. Drop this once upstream supports 26.04.",
+      "matchDepNames": ["ubuntu"],
+      "allowedVersions": "<26.04",
       "automerge": false
     },
     {
-      "description": "Keep first-party OCI context images fresh immediately",
-      "matchDepNames": ["ghcr.io/projectbluefin/common", "ghcr.io/ublue-os/brew"],
-      "matchUpdateTypes": ["digest", "pinDigest", "pin"],
-      "automerge": true,
-      "schedule": ["at any time"]
-    },
-    {
-      "description": "Do not automatically cross Fedora major releases",
-      "matchDepNames": ["quay.io/fedora-ostree-desktops/silverblue"],
+      "description": "A major crossing always waits for a human — never automerge one. Last matching rule wins, so keep this rule last.",
       "matchUpdateTypes": ["major"],
-      "enabled": false
-    },
-    {
-      "description": "Require human review for GitHub Actions updates — automerged action SHA bumps would run unreviewed code in privileged workflows (packages:write, id-token:write, secrets:inherit). Last matching rule wins, so keep this rule last.",
-      "matchManagers": ["github-actions"],
       "automerge": false
     }
   ]

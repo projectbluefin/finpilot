@@ -3,19 +3,16 @@ name: Unit Tests
 on:
   pull_request:
     branches: [main, stable]
-    paths:
-      - "build/**"
-      - "tests/**"
-      - "Justfile"
-      - ".github/workflows/unit-tests.yml"
+    # Run unless the change is documentation-only. The suite reads Containerfile,
+    # Justfile, build/, custom/ and .github/, so enumerating subjects here is a
+    # second copy of that list that silently stops running the tests when a
+    # subject is missed. Ignoring only docs keeps the trigger truthful.
+    paths-ignore:
+      - "**.md"
   push:
     branches: [main, stable]
-    paths:
-      - "build/**"
-      - "tests/**"
-      - "Justfile"
-      - ".github/workflows/unit-tests.yml"
-  merge_group:
+    paths-ignore:
+      - "**.md"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
@@ -50,4 +47,5 @@ jobs:
       - name: Install bats
         run: sudo apt-get update && sudo apt-get install -y bats
       - name: Run unit tests
-        run: bats --print-output-on-failure tests/unit
+        # `just test-unit` is the single definition of how the suite runs.
+        run: just test-unit

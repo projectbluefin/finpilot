@@ -3,15 +3,14 @@
 ###############################################################################
 # Name: finpilot
 #
-# IMPORTANT: Change "finpilot" above to your desired project name.
-# This name is restated in several files that cannot read each other. The
-# authoritative name at publish time is the repository name: build-image.yml
+# The authoritative name at publish time is the repository name: build-image.yml
 # derives IMAGE_NAME from ${{ github.event.repository.name }} and pushes the
-# GHCR package under it. The value below is the fallback used by local
-# `just build` and by the image-identity metadata written into the image.
+# GHCR package under it. This value is the fallback for local `just build` and
+# the image identity metadata.
 #
-# When forking, update every site listed under "Rename the Project" in
-# README.md. Nothing validates that these agree — see issue #291.
+# Two other files carry the name as a literal: the Justfile's IMAGE_NAME default
+# and artifacthub-repo.yml's repositoryID. tests/contract/identity_test.bats
+# fails when the three disagree. See "Quick start" in README.md.
 ###############################################################################
 
 ###############################################################################
@@ -22,21 +21,22 @@
 #
 # 1. Context Stage (ctx) - Combines resources from:
 #    - Local build scripts and custom files
-#    - @projectbluefin/common - Desktop configuration shared with Aurora
+#    - @projectbluefin/common - The shared desktop configuration and plumbing
 #    - @ublue-os/brew - Homebrew integration
 #
 # 2. Base Image Options (edit the FROM line below):
-#    - `quay.io/fedora-ostree-desktops/silverblue:44` (Fedora 44 and GNOME)
-#    - `quay.io/fedora-ostree-desktops/base-main:44` (Fedora 44, no desktop)
+#    - `quay.io/fedora-ostree-desktops/silverblue` (Fedora, GNOME desktop)
+#    - `quay.io/fedora-ostree-desktops/base-main` (Fedora, no desktop)
 #    - `quay.io/centos-bootc/centos-bootc:stream10` (CentOS-based)
+#    - `quay.io/hummingbird-community/bootc-os` (Hummingbird-based, minimal)
 #
 # See: https://docs.projectbluefin.io/contributing/ for architecture diagram
 ###############################################################################
 
 # OCI context images - imported below and pinned directly in their FROM lines.
 # The base image is pinned in the FROM line below and updated by Renovate.
-FROM ghcr.io/projectbluefin/common:latest@sha256:df2fa93dac84cda91d568bd694e5051abbbdba37bf3d54a6cc15cdc80e645e2c AS common
-FROM ghcr.io/ublue-os/brew:latest@sha256:5c5b6dea4b9faaab4d6fa81d7fc4f37f218c8a75a0839c72ae70b268bfdf4b0f AS brew
+FROM ghcr.io/projectbluefin/common:latest@sha256:b7e3487cafe8b21e10bb514f218406548f4c1abef5e444963094cbf2ec60e4b1 AS common
+FROM ghcr.io/ublue-os/brew:latest@sha256:60ada2d65891d8797beef49d8b43f2108519cbbaf04c9c7363e1a008677fcd35 AS brew
 
 # Context stage - combine local and imported OCI container resources
 FROM scratch AS ctx
@@ -50,15 +50,15 @@ COPY --from=brew /system_files /oci/brew
 
 # Base Image - GNOME included (Fedora official OSTree desktop)
 # Renovate will keep the digest pin up to date.
-FROM quay.io/fedora-ostree-desktops/silverblue:44@sha256:065a194d83cc86785e25f0e5857f8282019fce0d4d3a64239bb148b7b3dc19c1
+FROM quay.io/fedora-ostree-desktops/silverblue:44@sha256:fac5b1dd12fb12b882d6fea54c38276fcd4baca24c0a303ddac0f13e03bb5d34
 
 # Image identity - these define how bootc, fastfetch, and the ublue ecosystem
 # recognize your image. Change these to match your project name.
 ARG IMAGE_NAME="finpilot"
 ARG IMAGE_VENDOR="projectbluefin"
 ARG UBLUE_IMAGE_TAG="stable"
-ARG BASE_IMAGE_NAME="silverblue"
-ARG FEDORA_MAJOR_VERSION="44"
+# Supplied by `just build` from the base image's FROM line.
+ARG BASE_IMAGE_NAME=""
 ARG VERSION=""
 
 ### MODIFICATIONS
@@ -68,7 +68,9 @@ ARG VERSION=""
 ##   - Local custom files from /custom
 ##   - Files from @projectbluefin/common at /oci/common (includes branding/artwork content)
 ##   - Files from @ublue-os/brew at /oci/brew
-## Scripts are run in numerical order (10-build.sh, 20-example.sh, etc.)
+## Scripts run in the order of the RUN blocks below: image identity, runtime
+## overlays, default packages and services, then cleanup. An activated example
+## gets its own block between the package phase and the cleanup phase.
 
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=tmpfs,dst=/boot \
@@ -80,23 +82,38 @@ RUN cp /etc/dnf/dnf.conf /etc/dnf/dnf.conf.tmp \
     && mv /etc/dnf/dnf.conf.tmp /etc/dnf/dnf.conf \
     && dnf5 config-manager setopt keepcache=1 install_weak_deps=0
 
+### RUNTIME OVERLAYS
+## Overlays Common's shared runtime layer and the Brew integration files, then
+## copies the template's custom declarations (Brewfiles, ujust recipes, Flatpak
+## preinstalls, /etc/skel seeds) and enables the units that consume them.
+## This phase installs no packages; see the package phase below.
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=cache,dst=/var/cache/libdnf5 \
     --mount=type=cache,dst=/var/cache/rpm-ostree \
-    --mount=type=secret,id=GITHUB_TOKEN \
     --mount=type=tmpfs,dst=/boot \
     --mount=type=tmpfs,dst=/tmp \
-    /ctx/build/10-build.sh
+    /ctx/build/10-overlay.sh
+
+### DEFAULT PACKAGES AND SERVICES
+## Installs the image's default RPM and COPR packages and enables the services
+## they provide. Packages live here, not in the overlay phase, so overlay edits
+## cannot invalidate the package layer.
+RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
+    --mount=type=cache,dst=/var/cache/libdnf5 \
+    --mount=type=cache,dst=/var/cache/rpm-ostree \
+    --mount=type=tmpfs,dst=/boot \
+    --mount=type=tmpfs,dst=/tmp \
+    /ctx/build/20-packages-and-services.sh
 
 ### CLEANUP
-## Use Bluefin's clean-stage.sh to remove build artifacts before linting.
-## /run is deliberately not mounted as tmpfs here: clean-stage.sh must remove
-## image-layer files such as /run/dnf so bootc lint's nonempty-run-tmp check
-## passes. The script tolerates busy Buildah bind mounts while clearing contents.
+## Finalises package and Flatpak sources, then prunes build artifacts before
+## linting. /run is deliberately not mounted as tmpfs here: the script must
+## remove image-layer files such as /run/dnf so bootc lint's nonempty-run-tmp
+## check passes. It tolerates busy Buildah bind mounts while clearing contents.
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=tmpfs,dst=/tmp \
     --mount=type=tmpfs,dst=/boot \
-    /ctx/build/clean-stage.sh
+    /ctx/build/90-cleanup.sh
 
 ### /opt
 ## Makes /opt writeable by default. Needs to be here to make the main image
@@ -105,6 +122,37 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
 ## (e.g. google-chrome, docker-desktop), replace the next line with:
 ##   RUN rm /opt && mkdir /opt
 RUN rm -rf /opt && ln -s /var/opt /opt
+
+### IMAGE METADATA
+## The Containerfile owns the metadata schema baked into every image. Local
+## builds and CI supply the dynamic values through `just build`; keeping these
+## ARGs late prevents a new version or timestamp from invalidating package and
+## overlay layers above.
+ARG IMAGE_DESC="My Customized Universal Blue Image"
+ARG IMAGE_CREATED=""
+ARG IMAGE_LOGO_URL="https://avatars.githubusercontent.com/u/120078124?s=200&v=4"
+ARG IMAGE_KEYWORDS="bootc,ublue,universal-blue"
+ARG IMAGE_REF="main"
+## The commit the image was built from. It is declared here, with the other
+## volatile metadata, so a new commit only invalidates the label layer.
+## Declaring it before 00-image-info.sh would invalidate the package and overlay
+## layers on every commit, which is why os-release does not carry it.
+ARG SHA_HEAD_SHORT=""
+
+LABEL org.opencontainers.image.title="${IMAGE_NAME}" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${SHA_HEAD_SHORT}" \
+      org.opencontainers.image.description="${IMAGE_DESC}" \
+      org.opencontainers.image.source="https://github.com/${IMAGE_VENDOR}/${IMAGE_NAME}/blob/${IMAGE_REF}/Containerfile" \
+      org.opencontainers.image.url="https://github.com/${IMAGE_VENDOR}/${IMAGE_NAME}" \
+      org.opencontainers.image.vendor="${IMAGE_VENDOR}" \
+      org.opencontainers.image.created="${IMAGE_CREATED}" \
+      io.artifacthub.package.readme-url="https://raw.githubusercontent.com/${IMAGE_VENDOR}/${IMAGE_NAME}/refs/heads/main/README.md" \
+      io.artifacthub.package.logo-url="${IMAGE_LOGO_URL}" \
+      io.artifacthub.package.keywords="${IMAGE_KEYWORDS}" \
+      io.artifacthub.package.license="Apache-2.0" \
+      io.artifacthub.package.deprecated="false" \
+      containers.bootc="1"
 
 ### INIT
 ## Required for bootc images

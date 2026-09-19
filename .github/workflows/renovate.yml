@@ -15,43 +15,8 @@ permissions: {}
 
 jobs:
   renovate:
-    name: Renovate
-    runs-on: ubuntu-latest
     permissions:
       contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-
-      - name: Check for RENOVATE_TOKEN
-        id: token-check
-        shell: bash
-        env:
-          TOKEN: ${{ secrets.RENOVATE_TOKEN }}
-        run: |
-          if [[ -z "${TOKEN}" ]]; then
-            echo "RENOVATE_TOKEN secret not configured — skipping Renovate."
-            echo "See .github/SETUP_CHECKLIST.md to set up the token."
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "configured=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Validate RENOVATE_TOKEN
-        if: steps.token-check.outputs.configured == 'true'
-        uses: ./.github/actions/check-token-health
-        with:
-          token: ${{ secrets.RENOVATE_TOKEN }}
-          token_name: RENOVATE_TOKEN
-          required_scopes: repo,workflow
-
-      - name: Run Renovate
-        if: steps.token-check.outputs.configured == 'true'
-        uses: renovatebot/github-action@37beffda261423addd537c33f2d126df7f6ffbab # v46.2.6
-        with:
-          token: ${{ secrets.RENOVATE_TOKEN }}
-        env:
-          LOG_LEVEL: debug
-          RENOVATE_REPOSITORIES: '["${{ github.repository }}"]'
+    uses: projectbluefin/actions/.github/workflows/reusable-renovate.yml@ce1d0c6bb5baf8bab3a5b226e693c9fd26b3c4a8 # v1
+    secrets:
+      renovate_token: ${{ secrets.RENOVATE_TOKEN }}

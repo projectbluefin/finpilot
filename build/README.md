@@ -1,77 +1,55 @@
-# Build Scripts
+# Build scripts
 
-This directory contains build scripts used during image creation. The default Containerfile explicitly runs the required scripts; extra scripts must be explicitly added to the Containerfile.
+Scripts that run during image assembly. The Containerfile names each one in its
+own `RUN` block, so the order is whatever the Containerfile says — there is no
+prefix auto-discovery. The numbers communicate intent.
 
-## How It Works
+## Phases
 
-Scripts are named with a number prefix (e.g., `10-build.sh`, `20-onepassword.sh`) and run in ascending order during the container build process.
+| Script | Does |
+|---|---|
+| `00-image-info.sh` | Writes the image identity into `os-release` and `image-info.json`: the base image name, the Fedora major derived from the base's `os-release`, the version string, and the tag. |
+| `10-overlay.sh` | Overlays `projectbluefin/common`'s shared layer and the Brew integration, copies this template's declarations (Brewfiles, ujust recipes, Flatpak preinstalls, `/etc/skel` seeds), and enables the units that consume them. Installs no packages. |
+| `20-packages-and-services.sh` | Installs the default RPM and COPR packages and enables their services. Packages live here, not in the overlay phase, so an overlay edit cannot invalidate the package layer. |
+| `90-cleanup.sh` | Finalises package and Flatpak sources, prunes build artifacts, and prepares for `bootc container lint`. |
 
-## Included Scripts
+Helpers, not phases: `copr-helpers.sh` (sourced), `validate-brewfiles.sh`, and
+`validate-flatpaks.sh` (called by the Justfile and CI).
 
-- **`10-build.sh`** - Main build script for base system modifications, package installation, and service configuration
+## Examples
 
-## Example Scripts
+Inactive until you activate them:
 
-- **`20-onepassword.sh.example`** - Example showing how to install software from third-party RPM repositories (Google Chrome, 1Password)
-- **`30-cosmic-desktop.sh.example`** - Example showing how to replace the GNOME desktop with COSMIC desktop
-- **`40-nvidia.sh.example`** - Example showing how to add NVIDIA drivers and CDI container support
+- `30-tailscale.sh.example` — a third-party RPM repository done safely
+- `40-gnome-extensions.sh.example` — GNOME Shell extensions with a dconf override
+- `50-nvidia.sh.example` — NVIDIA drivers and CDI container support
+- `60-desktop-swap.sh.example` — replacing the GNOME desktop
 
-To use an example script:
-1. Rename it to remove the `.example` extension (for example, `mv build/20-onepassword.sh.example build/20-onepassword.sh`).
-2. Add the standard `RUN` block below after the `10-build.sh` block in `Containerfile`, replacing `NN-example.sh` with the renamed script.
-3. Run `just build`.
+To activate one, rename it off `.example` and add a `RUN` block to the
+Containerfile after the package phase and before the cleanup phase. Copy the
+shape below and substitute your script's path:
 
 ```dockerfile
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=cache,dst=/var/cache/libdnf5 \
     --mount=type=cache,dst=/var/cache/rpm-ostree \
-    --mount=type=secret,id=GITHUB_TOKEN \
     --mount=type=tmpfs,dst=/boot \
     --mount=type=tmpfs,dst=/tmp \
     /ctx/build/NN-example.sh
 ```
 
-## Creating Your Own Scripts
+Deactivating is the reverse: delete the block, rename the file back.
 
-Create numbered scripts for different purposes:
-
-```bash
-# 10-build.sh - Base system (already exists)
-# 20-drivers.sh - Hardware drivers
-# 30-development.sh - Development tools
-# 40-gaming.sh - Gaming software
-# 50-cleanup.sh - Final cleanup tasks
-```
-
-### Script Template
+## Writing one
 
 ```bash
 #!/usr/bin/env bash
-set -oue pipefail
+set -euo pipefail
 
-echo "Running custom setup..."
-# Your commands here
+dnf5 install -y package-name
 ```
 
-### Best Practices
-
-- **Use descriptive names**: `40-nvidia.sh` is better than `40-stuff.sh`
-- **One purpose per script**: Easier to debug and maintain
-- **Clean up after yourself**: Remove temporary files and disable temporary repos
-- **Test incrementally**: Add one script at a time and test builds
-- **Comment your code**: Future you will thank present you
-
-### Disabling Scripts
-
-To disable an activated script, remove its corresponding `RUN` block from `Containerfile` and rename it back to `.example` (or remove it).
-
-## Execution Order
-
-The template runs scripts explicitly, rather than automatically discovering files by prefix. Place extra script blocks after `10-build.sh` and before `clean-stage.sh`. Use numbered names to communicate the intended order.
-
-## Notes
-
-- Scripts run as root during build
-- Build context is available at `/ctx`
-- Use dnf5 for package management (not dnf or yum)
-- Always use `-y` flag for non-interactive installs
+- Scripts run as root, with the build context at `/ctx`.
+- Use `dnf5`, never `dnf` or `yum`, and always `-y`.
+- Disable any repository you enable. `copr_install_isolated` does it for COPRs.
+- Keep one purpose per script, and name it for that purpose.

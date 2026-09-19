@@ -5,8 +5,9 @@ permissions:
 on:
   pull_request:
     paths:
-      - "custom/ujust/**"
+      - "**/*.just"
       - "Justfile"
+      - ".github/workflows/validate-justfiles.yml"
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -17,24 +18,9 @@ jobs:
       - name: Install just
         uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
 
+      # `just check` is the single definition of this contract: it covers the
+      # root Justfile and every .just file, so the workflow cannot drift from
+      # what a contributor runs locally.
       - name: Validate Justfiles
         shell: bash
-        run: |
-          echo "Validating justfiles in custom/ujust/ directory..."
-
-          set -xeuo pipefail
-
-          # Validate root Justfile
-          echo "::group:: Validating Justfile"
-          just --unstable --fmt --check -f Justfile
-          echo "::endgroup::"
-
-          # Validate custom ujust files
-          find "custom/ujust" -iname '*.just' -print0 | \
-            while IFS= read -r -d '' justfile ; do \
-              echo "::group:: ===$(basename "$justfile")==="
-              just --unstable --fmt --check -f "$justfile"
-              echo "::endgroup::"
-            done
-
-          echo "All justfiles are valid"
+        run: just check

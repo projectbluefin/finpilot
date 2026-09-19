@@ -2,91 +2,136 @@
 #######################
 ### custom-system.just
 #######################
-## Example system configuration commands
-## These are simplified examples adapted from Bluefin
+## System-level commands.
+##
+## Nothing here runs automatically: image updates and logins never overwrite
+## user configuration or change group membership. These recipes are the
+## explicit, user-invoked way to do both.
 
-# Run a system benchmark (requires stress-ng from Homebrew)
-[group('System')]
-benchmark:
-    #!/usr/bin/env bash
-    source /usr/lib/ujust/ujust.sh
-    if ! type -P "stress-ng" &>/dev/null ; then
-        echo "stress-ng is not installed."
-        if command -v brew &>/dev/null; then
-            if gum confirm "Install stress-ng via Homebrew?" ; then
-                brew install stress-ng
-                brew link stress-ng
-            else
-                exit 0
-            fi
-        else
-            echo "Please install stress-ng to run benchmarks."
-            exit 1
-        fi
-    fi
-    echo 'Running a 1 minute benchmark...'
-    pushd $(mktemp -d) > /dev/null
-    stress-ng --matrix 0 -t 1m --times
-    popd > /dev/null
-
-# Configure docker and libvirt groups for development
+# Add the current user to the docker and libvirt groups, creating them if needed.
 [group('System')]
 configure-dev-groups:
-    #!/usr/bin/pkexec bash
-    CURRENT_USER="{{ `id -un` }}"
-    echo "Adding $CURRENT_USER to docker and libvirt groups..."
+    #!/usr/bin/env bash
+    set -euo pipefail
 
-    # Ensure groups exist in /etc/group
-    for group in docker libvirt; do
-        if ! grep -q "^$group:" /etc/group; then
-            echo "Adding $group to /etc/group"
-            grep "^$group:" /usr/lib/group | tee -a /etc/group > /dev/null
+    # Fedora ships no /usr/lib/group entry to copy for either name, and both
+    # daemons are opt-in for a fork, so create a group when it is missing rather
+    # than assume a package provided it. Only the mutating commands escalate;
+    # the checks run as the invoking user.
+    CURRENT_USER="$(id -un)"
+    DEV_GROUPS=(docker libvirt)
+    MISSING=()
+
+    for group in "${DEV_GROUPS[@]}"; do
+        if ! getent group "${group}" >/dev/null; then
+            echo "Creating the ${group} group"
+            sudo groupadd --system "${group}"
         fi
-        usermod -aG $group $CURRENT_USER
+        if ! id -nG "${CURRENT_USER}" | grep -qw "${group}"; then
+            MISSING+=("${group}")
+        fi
     done
 
-    echo "Groups configured. Log out and back in for changes to take effect."
+    if ((${#MISSING[@]} == 0)); then
+        echo "${CURRENT_USER} is already in: ${DEV_GROUPS[*]}"
+        exit 0
+    fi
 
-# Example toggle command with user choice
+    if command -v gum >/dev/null 2>&1; then
+        if ! gum confirm "Add ${CURRENT_USER} to: ${MISSING[*]}?"; then
+            echo "Cancelled."
+            exit 0
+        fi
+    fi
+
+    GROUP_LIST="$(IFS=,; echo "${MISSING[*]}")"
+    sudo usermod --append --groups "${GROUP_LIST}" "${CURRENT_USER}"
+    echo "Added ${CURRENT_USER} to: ${MISSING[*]}"
+    echo "Log out and back in before using docker or libvirt without sudo."
+
+# Restore the image's default user configuration into this user's home.
 [group('System')]
-toggle-example-feature:
-    #!/usr/bin/bash
-    source /usr/lib/ujust/ujust.sh
-    echo "This is an example toggle command."
-    echo "Current status: [check your status here]"
-    OPTION=$(Choose "Enable" "Disable" "Cancel")
-    case "$OPTION" in
-        "Enable")
-            echo "Enabling feature..."
-            # Add your enable logic here
-            ;;
-        "Disable")
-            echo "Disabling feature..."
-            # Add your disable logic here
-            ;;
-        "Cancel")
-            echo "No changes made."
-            ;;
-    esac
+install-config:
+    #!/usr/bin/env bash
+    set -euo pipefail
 
-# Clean up container images and volumes
-[group('Maintenance')]
-clean-containers:
-    #!/usr/bin/bash
-    echo "Cleaning up Podman containers, images, and volumes..."
-    podman system prune -af
-    podman volume prune -f
-    echo "Cleanup complete!"
+    # The defaults live in /etc/skel/.config, which covers every account created
+    # after the build. An existing user's own files always win: nothing applies
+    # them on login or on an image update, so this is the explicit way to get
+    # them back. Files it replaces are backed up beside the original.
+    SKEL_CONFIG="${SKEL_CONFIG:-/etc/skel/.config}"
+    USER_CONFIG="${USER_CONFIG:-${HOME}/.config}"
+    TIMESTAMP="$(date +%Y-%m-%d_%H-%M-%S)"
 
-# Update system and reboot if needed
-[group('Maintenance')]
-update-and-reboot:
-    #!/usr/bin/bash
-    source /usr/lib/ujust/ujust.sh
-    echo "Updating system..."
-    sudo bootc upgrade
-    if gum confirm "Reboot now to apply updates?"; then
-        systemctl reboot
-    else
-        echo "Reboot later to apply updates."
+    bold="$(tput bold 2>/dev/null || printf '\033[1m')"
+    normal="$(tput sgr0 2>/dev/null || printf '\033[0m')"
+
+    if [[ ! -d "${SKEL_CONFIG}" ]]; then
+        echo "Error: ${SKEL_CONFIG} does not exist" >&2
+        exit 1
+    fi
+
+    # Collect conflicts first, so the prompt shows the full set before anything
+    # is touched.
+    conflicts=()
+    while IFS= read -r -d '' file; do
+        relative="${file#"${SKEL_CONFIG}"/}"
+        target="${USER_CONFIG}/${relative}"
+        if [[ -e "${target}" || -L "${target}" ]]; then
+            conflicts+=("${relative}")
+        fi
+    done < <(find "${SKEL_CONFIG}" -type f -print0)
+
+    echo "${bold}Re-apply default configuration${normal}"
+    echo "  from: ${SKEL_CONFIG}"
+    echo "    to: ${USER_CONFIG}"
+    if ((${#conflicts[@]})); then
+        echo
+        echo "Already present, and will be backed up first:"
+        printf '  - %s\n' "${conflicts[@]}"
+    fi
+    echo
+
+    if command -v gum >/dev/null 2>&1; then
+        if ! gum confirm "Apply these defaults?"; then
+            echo "Cancelled."
+            exit 0
+        fi
+    fi
+
+    backed_up=()
+    installed=()
+    while IFS= read -r -d '' file; do
+        relative="${file#"${SKEL_CONFIG}"/}"
+        target="${USER_CONFIG}/${relative}"
+        target_dir="$(dirname "${target}")"
+
+        if ! mkdir -p "${target_dir}"; then
+            echo "  WARN: cannot create ${target_dir}, skipping ${relative}"
+            continue
+        fi
+
+        if [[ -e "${target}" || -L "${target}" ]]; then
+            backup="${target}.backup.${TIMESTAMP}"
+            n=1
+            while [[ -e "${backup}" || -L "${backup}" ]]; do
+                backup="${target}.backup.${TIMESTAMP}.${n}"
+                n=$((n + 1))
+            done
+            mv "${target}" "${backup}"
+            backed_up+=("${relative}")
+        fi
+
+        cp "${file}" "${target}"
+        installed+=("${relative}")
+    done < <(find "${SKEL_CONFIG}" -type f -print0)
+
+    echo
+    echo "${bold}Applied ${#installed[@]} file(s)${normal}"
+    if ((${#backed_up[@]})); then
+        echo
+        echo "Backed up:"
+        for entry in "${backed_up[@]}"; do
+            echo "  - ${entry}.backup.${TIMESTAMP}"
+        done
     fi
