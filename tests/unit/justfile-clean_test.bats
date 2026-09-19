@@ -13,8 +13,9 @@
 # the Justfile with `--working-directory` pointed at the sandbox, so the
 # deletions only ever touch throwaway files. The `sudoif` cases run with a
 # PATH that deliberately contains no `sudo`, which is the branch that must
-# refuse to run anything -- the escalating branches are never exercised, so a
-# test run can never gain privileges.
+# refuse to run anything. The one case that does reach the escalating branch
+# puts a stub `sudo` on PATH that only records its argv, so a test run can
+# never gain privileges.
 
 setup() {
 	REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../.." && pwd)"
@@ -175,4 +176,34 @@ run_recipe_without_sudo() {
 	run_recipe_without_sudo sudoif ls
 	[ "$status" -ne 0 ]
 	[[ "$output" == *"sudoif"* ]]
+}
+
+@test "sudoif: passes whitespace-containing arguments through as single words" {
+	# The dispatcher used to be invoked as `sudoif {{ command }} {{ args }}`,
+	# which word-split every argument before the function saw it. Escalation
+	# here goes through a stub `sudo` that only records its argv, so the test
+	# exercises the invocation without ever gaining privileges.
+	local stub_bin="${SANDBOX}/stub-bin"
+	mkdir -p "${stub_bin}"
+	ln -sf "${SUDOLESS_BIN}"/* "${stub_bin}/"
+
+	printf '#!/usr/bin/env bash\nprintf "[%%s]\\n" "$@" >%s/argv\n' "${SANDBOX}" \
+		>"${stub_bin}/sudo"
+	chmod +x "${stub_bin}/sudo"
+
+	run env -u SSH_ASKPASS -u DISPLAY -u WAYLAND_DISPLAY "PATH=${stub_bin}" \
+		just --justfile "${SANDBOX}/Justfile" --working-directory "${SANDBOX}" \
+		sudoif echo "hello world" plain
+	[ "$status" -eq 0 ]
+
+	if [[ "${UID}" -eq 0 ]]; then
+		skip "root takes the direct-exec branch and never reaches the sudo stub"
+	fi
+
+	[ -f "${SANDBOX}/argv" ]
+	run cat "${SANDBOX}/argv"
+	[ "${lines[0]}" = "[echo]" ]
+	[ "${lines[1]}" = "[hello world]" ]
+	[ "${lines[2]}" = "[plain]" ]
+	[ "${#lines[@]}" -eq 3 ]
 }
