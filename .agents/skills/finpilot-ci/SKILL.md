@@ -129,6 +129,13 @@ The `renovate.json` custom manager tracks this pattern:
 
 Never use `/releases/latest/` — it is non-reproducible.
 
+## Runner Package Installation (APT)
+
+When installing packages via APT on Ubuntu runners:
+- **Always update the package index first:** `sudo apt-get update && sudo apt-get install -y <pkg>`. Runner images snapshot package indexes when built; whenever an upstream dependency revision is published, the pinned `.deb` URL in the stale index 404s (exit 100).
+- **Use `apt-get`, not `apt`:** `apt` prints warnings about an unstable CLI interface when used in scripts.
+- **Fail fast:** use `set -euo pipefail` in multiline shell steps.
+
 ## Renovate Automerge Scope
 
 ### ✅ Safe to automerge broadly (digest/pin only)
@@ -201,6 +208,8 @@ Add suppressions sparingly. If you suppress a new rule, document the reason inli
 ## Red Flags
 
 - Tool installed via `/releases/latest/` without version pin
+- Package installed via apt/apt-get without prior apt-get update
+- `apt` used in workflow scripts instead of `apt-get`
 - Automerge rule includes `minor` or `patch` for all packages (`matchPackageNames` not scoped)
 - Composite action used with a floating tag (`@v1`, `@main`) instead of a commit SHA
 - `GITHUB_TOKEN` used as the Renovate token (it cannot open PRs to other repos)
@@ -210,6 +219,7 @@ Add suppressions sparingly. If you suppress a new rule, document the reason inli
 
 - [ ] Every `uses:` in workflows is pinned to a commit SHA with a version comment?
 - [ ] Every new tool install has a pinned version + `# renovate: datasource=...` comment?
+- [ ] Any APT package installs run `apt-get update` first and use `apt-get` instead of `apt`?
 - [ ] Automerge broad rule is `digest/pin/pinDigest` only (not `minor`/`patch`)?
 - [ ] `actionlint .github/workflows/*.yml` passes clean?
 - [ ] `renovate-config-validator .github/renovate.json` passes clean?
