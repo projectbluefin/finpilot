@@ -160,7 +160,6 @@ pat_headers() {
 }
 
 @test "missing rate limit headers report unknown and still pass" {
-    skip "known defect #339: RATE_REMAINING=\$(grep ...) aborts under set -e when the header is absent"
     STUB_HEADERS="$(printf 'HTTP/2 200\r\n')"
     run bash "${SCRIPT}"
     [ "${status}" -eq 0 ]
@@ -234,7 +233,6 @@ pat_headers() {
 }
 
 @test "fine-grained token without a scopes header skips the scope check" {
-    skip "known defect #339: SCOPES=\$(grep ...) aborts under set -e, so the documented fine-grained/App-token branch is unreachable"
     REQUIRED_SCOPES="repo,workflow"
     STUB_HEADERS="$(printf 'HTTP/2 200\r\nx-ratelimit-limit: 5000\r\nx-ratelimit-remaining: 4999\r\n')"
     run bash "${SCRIPT}"
@@ -285,4 +283,34 @@ pat_headers() {
     run bash "${SCRIPT}"
     [ "${status}" -eq 0 ]
     grep -q -- '-D /tmp/token-health-headers-' "${CURL_ARGS}"
+}
+
+@test "an App installation token response with no optional headers still passes" {
+    # GitHub returns neither x-oauth-scopes nor the rate-limit headers for some
+    # App installation token responses. Every optional header is absent here.
+    STUB_HEADERS="$(printf 'HTTP/2 200\r\n')"
+    REQUIRED_SCOPES=""
+    run bash "${SCRIPT}"
+    [ "${status}" -eq 0 ]
+    [[ "${output}" == *"No OAuth scopes header"* ]]
+    grep -qx 'valid=true' "${OUTPUT_FILE}"
+    grep -qx 'rate_remaining=unknown' "${OUTPUT_FILE}"
+}
+
+@test "a required scope is still enforced when the scopes header is present" {
+    REQUIRED_SCOPES="repo,admin:org"
+    STUB_HEADERS="$(pat_headers)"
+    run bash "${SCRIPT}"
+    [ "${status}" -eq 1 ]
+    [[ "${output}" == *"missing required scope: admin:org"* ]]
+    grep -qx 'valid=false' "${OUTPUT_FILE}"
+}
+
+@test "a non-numeric rate-limit value neither warns nor fails the step" {
+    STUB_HEADERS="$(printf 'HTTP/2 200\r\nx-ratelimit-limit: unknown\r\nx-ratelimit-remaining: unknown\r\nx-oauth-scopes: repo\r\n')"
+    MIN_REMAINING="100"
+    run bash "${SCRIPT}"
+    [ "${status}" -eq 0 ]
+    [[ "${output}" != *"::warning::"* ]]
+    grep -qx 'valid=true' "${OUTPUT_FILE}"
 }

@@ -33,17 +33,31 @@ fi
 
 echo "Token is valid (HTTP ${HTTP_CODE})."
 
+# Read one response header, treating its absence as "not present" rather than
+# as an error. Under `set -euo pipefail` a bare VAR=$(grep ...) takes the exit
+# status of the substitution, so a response that omits the header would abort
+# the whole check -- which is what GitHub returns for fine-grained PATs and App
+# installation tokens (issue #339).
+header_value() {
+	grep -i "^$1:" "${HEADERS_FILE}" \
+		| tail -n 1 \
+		| sed "s/^[^:]*:[[:space:]]*//" \
+		| tr -d '\r' || true
+}
+
 # Parse rate-limit info
-RATE_REMAINING=$(grep -i "^x-ratelimit-remaining:" "${HEADERS_FILE}" | awk '{print $2}' | tr -d '\r')
-RATE_LIMIT=$(grep -i "^x-ratelimit-limit:" "${HEADERS_FILE}" | awk '{print $2}' | tr -d '\r')
+RATE_REMAINING=$(header_value "x-ratelimit-remaining")
+RATE_LIMIT=$(header_value "x-ratelimit-limit")
 echo "Rate limit: ${RATE_REMAINING:-unknown}/${RATE_LIMIT:-unknown}"
 
-if [[ -n "${RATE_REMAINING}" && "${RATE_REMAINING}" -lt "${MIN_REMAINING}" ]]; then
+# A non-numeric or absent value is not a threshold breach: `-lt` on one would
+# itself fail the step.
+if [[ "${RATE_REMAINING}" =~ ^[0-9]+$ && "${RATE_REMAINING}" -lt "${MIN_REMAINING}" ]]; then
 	echo "::warning::${TOKEN_NAME} has only ${RATE_REMAINING} API requests remaining (minimum: ${MIN_REMAINING})"
 fi
 
 # Check scopes (PATs only — fine-grained tokens don't expose scopes this way)
-SCOPES=$(grep -i "^x-oauth-scopes:" "${HEADERS_FILE}" | sed 's/^x-oauth-scopes:\s*//i' | tr -d '\r')
+SCOPES=$(header_value "x-oauth-scopes")
 EXPIRES_AT=""
 
 if [[ -n "${SCOPES}" ]]; then
