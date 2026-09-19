@@ -3,18 +3,8 @@ name: Unit Tests
 on:
   pull_request:
     branches: [main, stable]
-    paths:
-      - "build/**"
-      - "tests/**"
-      - "Justfile"
-      - ".github/workflows/unit-tests.yml"
   push:
     branches: [main, stable]
-    paths:
-      - "build/**"
-      - "tests/**"
-      - "Justfile"
-      - ".github/workflows/unit-tests.yml"
   merge_group:
 
 concurrency:
