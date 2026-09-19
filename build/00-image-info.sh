@@ -64,8 +64,28 @@ echo "  image-vendor: ${IMAGE_VENDOR}"
 ###############################################################################
 # Customize /usr/lib/os-release
 ###############################################################################
-# Only modify if the file exists and VARIANT_ID is not already set
-if [[ -f "${OS_RELEASE}" ]] && ! grep -q "^VARIANT_ID=" "${OS_RELEASE}"; then
+# The block below is guarded by its own marker, not by VARIANT_ID: every
+# fedora-ostree-desktops base already ships a VARIANT_ID (silverblue, kinoite,
+# ...), so keying off it would skip the append on every real build.
+OS_RELEASE_MARKER="# ${IMAGE_NAME} image identity"
+
+# Keys this script owns. Stale values inherited from the base image are removed
+# before the block is appended, so no key is ever defined twice.
+OS_RELEASE_KEYS=(
+	VARIANT
+	VARIANT_ID
+	PRETTY_NAME
+	NAME
+	IMAGE_ID
+	IMAGE_VERSION
+	ID_LIKE
+	HOME_URL
+	DOCUMENTATION_URL
+	SUPPORT_URL
+	BUG_REPORT_URL
+)
+
+if [[ -f "${OS_RELEASE}" ]] && ! grep -qxF "${OS_RELEASE_MARKER}" "${OS_RELEASE}"; then
 	# Read existing values
 	if [[ -n "${VERSION:-}" ]]; then
 		OS_VERSION="${VERSION}"
@@ -73,10 +93,15 @@ if [[ -f "${OS_RELEASE}" ]] && ! grep -q "^VARIANT_ID=" "${OS_RELEASE}"; then
 		OS_VERSION="${UBLUE_IMAGE_TAG}"
 	fi
 
+	for key in "${OS_RELEASE_KEYS[@]}"; do
+		sed -i "/^${key}=/d" "${OS_RELEASE}"
+	done
+
 	# Append our identity
 	cat >>"${OS_RELEASE}" <<EOF
 
-# ${IMAGE_NAME} image identity
+${OS_RELEASE_MARKER}
+VARIANT="${IMAGE_PRETTY_NAME}"
 VARIANT_ID="${IMAGE_FLAVOR}"
 PRETTY_NAME="${IMAGE_PRETTY_NAME}"
 NAME="${IMAGE_NAME}"
