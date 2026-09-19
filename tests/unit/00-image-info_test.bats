@@ -35,7 +35,8 @@ setup() {
     export BASE_IMAGE_NAME="silverblue"
     export FEDORA_MAJOR_VERSION="42"
 
-    # A stock os-release with no VARIANT_ID, matching a fresh Fedora base image.
+    # A stock os-release with no VARIANT_ID. Real fedora-ostree-desktops bases
+    # do ship one; the tests that care add it explicitly.
     cat >"${OS_RELEASE}" <<'EOF'
 NAME="Fedora Linux"
 ID=fedora
@@ -185,15 +186,35 @@ json_field() {
     [ "$output" -eq 1 ]
 }
 
-@test "00-image-info: pre-existing VARIANT_ID suppresses the os-release append" {
-    printf 'VARIANT_ID="preset"\n' >>"${OS_RELEASE}"
+@test "00-image-info: pre-existing VARIANT_ID does not suppress the os-release append" {
+    # Every fedora-ostree-desktops base ships VARIANT_ID (silverblue, kinoite,
+    # ...), so a VARIANT_ID-keyed guard would make the branding dead code.
+    printf 'VARIANT="Silverblue"\nVARIANT_ID=silverblue\n' >>"${OS_RELEASE}"
     run bash "${SCRIPT}"
     [ "$status" -eq 0 ]
-    [[ "$output" != *"Customized"* ]]
+    [[ "$output" == *"Customized"* ]]
 
     run grep -c '^VARIANT_ID=' "${OS_RELEASE}"
     [ "$output" -eq 1 ]
-    grep -q '^VARIANT_ID="preset"$' "${OS_RELEASE}"
+    grep -q '^VARIANT_ID="main"$' "${OS_RELEASE}"
+    grep -q '^VARIANT="My Custom OS"$' "${OS_RELEASE}"
+    grep -q '^IMAGE_ID="finpilot"$' "${OS_RELEASE}"
+}
+
+@test "00-image-info: base-image values for owned keys are replaced, not duplicated" {
+    printf 'PRETTY_NAME="Fedora Linux 42 (Silverblue)"\nHOME_URL="https://silverblue.fedoraproject.org"\n' >>"${OS_RELEASE}"
+    run bash "${SCRIPT}"
+    [ "$status" -eq 0 ]
+
+    for key in NAME PRETTY_NAME HOME_URL DOCUMENTATION_URL SUPPORT_URL BUG_REPORT_URL ID_LIKE; do
+        run grep -c "^${key}=" "${OS_RELEASE}"
+        [ "$output" -eq 1 ]
+    done
+    grep -q '^NAME="finpilot"$' "${OS_RELEASE}"
+    grep -q '^HOME_URL="https://github.com/projectbluefin/finpilot"$' "${OS_RELEASE}"
+    # Keys the script does not own survive untouched.
+    grep -q '^ID=fedora$' "${OS_RELEASE}"
+    grep -q '^VERSION_ID=42$' "${OS_RELEASE}"
 }
 
 @test "00-image-info: image-info.json is still written when os-release is absent" {
