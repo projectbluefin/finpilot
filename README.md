@@ -131,20 +131,26 @@ Click "Use this template" to create a new repository from this template.
 
 ### 2. Rename the Project
 
-Important: Change `finpilot` to your repository name in these 7 files:
+Important: Change `finpilot` to your repository name in these 6 files:
 
 1. `Containerfile` (`# Name:` comment and `ARG IMAGE_NAME`): `# Name: your-repo-name`
 2. `Justfile` (`export IMAGE_NAME := env("IMAGE_NAME", ...)`): `your-repo-name`
 3. `README.md` (title): `# your-repo-name`
 4. `artifacthub-repo.yml` (`repositoryID`): `repositoryID: your-repo-name`
 5. `custom/ujust/README.md` (bootc switch example): `localhost/your-repo-name:stable`
-6. `.github/workflows/clean.yml` (`packages`): `packages: your-repo-name`
-7. `iso/iso.toml` (bootc switch URL): `ghcr.io/YOUR_USERNAME/your-repo-name:stable`
+6. `iso/iso.toml` (bootc switch URL): `ghcr.io/your-org/your-repo-name:stable`
 
-Nothing validates that these seven agree with each other, and none of them is
-the name actually published: `build-image.yml` derives `IMAGE_NAME` from
-`github.event.repository.name` and pushes the GHCR package under that value.
-Site 7 in particular is load-bearing at runtime — `just build-iso` bakes it into
+`.github/workflows/clean.yml` is deliberately not on this list: it derives its
+cleanup target from `github.event.repository.name`, the same value
+`build-image.yml` publishes under, so it follows a rename by construction.
+
+`Containerfile`'s `ARG IMAGE_NAME` is the canonical value for the six sites
+above, and `tests/unit/image-identity_test.bats` fails the build if any of them
+disagrees with it — including this checklist. None of the six is the name
+actually published, though: `build-image.yml` derives `IMAGE_NAME` from
+`github.event.repository.name`, so renaming the repository (or exporting
+`IMAGE_NAME`) is still what changes the published package.
+Site 6 is load-bearing at runtime — `just build-iso` bakes it into
 the installer kickstart, so a missed rename pins first boot to a registry ref
 that does not exist. See [issue #291](https://github.com/projectbluefin/finpilot/issues/291).
 
@@ -252,6 +258,8 @@ For the automated promotion PR to open, your repository needs:
 - An **organization-owned repo with a `maintainers` team** — the workflow requests review from `<owner>/maintainers` when creating the PR. Personal-account forks can replace `.github/workflows/promote-main-to-stable.yml` with a local version that skips reviewer requests.
 - Branch protection on `stable`: **0 required approvals** means fully automatic promotion; **1 approval** means review, then auto-merge.
 - The release gate is advisory by default — make the promote workflow a required check on `stable` if a `release/blocked` result should block merging.
+
+> **Known release risk:** the release gate currently checks digest and cosign signature only — `run_e2e` is `false` in `promote-main-to-stable.yml` because this repository has no post-build/post-merge E2E workflow or `e2e_image` configured for the shared gate to exercise. Until an E2E workflow is added and `run_e2e: true` (with `e2e_image`/`e2e_suites`) is configured, treat a `release/ready` result as "signed and unmodified," not "functionally validated." See [#281](https://github.com/projectbluefin/finpilot/issues/281).
 
 ### 9. Deploy Your Image
 
