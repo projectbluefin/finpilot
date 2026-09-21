@@ -1,0 +1,117 @@
+---
+name: Execute Release
+
+# A stable release is an OCI promotion, not another build. Only the squash
+# promotion commit is eligible automatically; maintainers may dispatch this
+# workflow for deliberate recovery after inspecting the candidate.
+on:
+  push:
+    branches:
+      - stable
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+
+concurrency:
+  group: execute-release
+  cancel-in-progress: false
+
+jobs:
+  check-trigger:
+    name: Check release trigger
+    runs-on: ubuntu-latest
+    outputs:
+      is-promotion: ${{ steps.check.outputs.is-promotion }}
+    steps:
+      - name: Accept a promotion commit or manual recovery
+        id: check
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
+            echo "is-promotion=true" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          # A squash merge picks its subject from `squash_merge_commit_title`:
+          # this repo is COMMIT_OR_PR_TITLE and the promotion branch always
+          # carries a single commit, so the subject is the factory's own
+          # "chore: promote <source> to <target>". The rendered PR title,
+          # "ci(promote): <image> <source> → <target> <date>", is accepted too:
+          # it becomes the subject if the branch ever carries more than one
+          # commit or the setting changes to PR_TITLE. A merge commit produces
+          # neither.
+          if [[ "${COMMIT_MESSAGE}" =~ ^(ci[(]promote[)]:|chore:[[:space:]]+promote[[:space:]]) ]]; then
+            echo "is-promotion=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "is-promotion=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      # A push to `stable` that is not a promotion is always a mistake: stable
+      # receives no builds, so an image can only reach :stable through the
+      # candidate digest this workflow promotes. Fail loudly instead of
+      # reporting success without promoting anything.
+      - name: Refuse a non-promotion push to stable
+        if: steps.check.outputs.is-promotion != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "::error::This push to stable is not a promotion commit; nothing was promoted."
+          echo "::error::Land the change on main, then promote it: merge the PR from promote-main-to-stable.yml, or dispatch that workflow to expedite. Dispatch this workflow instead to promote the current candidate after inspecting it."
+          exit 1
+
+  execute:
+    name: Gate and promote candidate digest
+    needs: check-trigger
+    if: needs.check-trigger.outputs.is-promotion == 'true'
+    permissions:
+      actions: read
+      contents: write
+      issues: write
+      packages: write
+      pull-requests: write
+    uses: projectbluefin/actions/.github/workflows/reusable-execute-release.yml@837850b6100b22c7920476035e7e1c28fdbba67f # v1
+    with:
+      registry: ghcr.io/${{ github.repository_owner }}
+      variants: >-
+        [{"image":"${{ github.event.repository.name }}","source_tag":"testing","target_tag":"stable"}]
+      cosign_identity_regexp: >-
+        ^https://github\.com/${{ github.repository }}/\.github/workflows/
+      fast_forward_sha: ${{ github.sha }}
+      # The reusable refuses to resolve the mutable :testing tag unless main's
+      # tree still matches the promoted commit, so a promotion that has fallen
+      # behind main fails instead of publishing a newer candidate than the one
+      # the promotion PR was reviewed against. A manual dispatch is deliberate
+      # recovery — a maintainer inspected the candidate — so it is exempt.
+      source_branch: ${{ github.event_name == 'push' && 'main' || '' }}
+      # Personal image, so no e2e suites run. The reusable re-verifies the
+      # resolved candidate's cosign signature and copies that digest to :stable
+      # without rebuilding.
+      run_release_gate: false
+    secrets: inherit
+
+  release-notes:
+    name: Create stable GitHub release
+    needs: execute
+    if: always() && needs.execute.result == 'success'
+    permissions:
+      actions: read
+      contents: write
+      id-token: write
+      packages: read
+    # Finpilot's direct build does not upload an SBOM artifact. The supported
+    # reusable inline mode scans the already-promoted stable image instead.
+    uses: projectbluefin/actions/.github/workflows/reusable-release.yml@837850b6100b22c7920476035e7e1c28fdbba67f # v1
+    with:
+      stream_name: stable
+      image: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}
+      generate_sbom_inline: true
+      checkout_ref: stable
+      project_name: ${{ github.event.repository.name }}
+      badge_label: Stable
+      cert_identity_regexp: >-
+        ^https://github\.com/${{ github.repository }}/\.github/workflows/
+      docs_url: ${{ github.server_url }}/${{ github.repository }}/releases
+    secrets: inherit

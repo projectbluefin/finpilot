@@ -5,7 +5,6 @@ on:
     branches:
       - main
       - stable
-  merge_group:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
@@ -17,13 +16,52 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      # The promotion check below reads refs and commits through the API.
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
+      # The promotion branch is built by the factory reusable, which stages
+      # deletions with `git diff --diff-filter=D`. Git reports a moved file as a
+      # rename, so paths main moved survive on their old paths and the branch's
+      # tree stops matching main's. execute-release.yml's tree guard refuses such
+      # a release after the merge; fail it here instead, while it is still a PR.
+      - name: Verify the promotion matches main
+        if: github.head_ref == 'auto/promote-main-to-stable'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          head_tree=$(gh api \
+            "repos/${{ github.repository }}/git/commits/${{ github.event.pull_request.head.sha }}" \
+            --jq '.tree.sha')
+          main_sha=$(gh api "repos/${{ github.repository }}/git/ref/heads/main" --jq '.object.sha')
+          main_tree=$(gh api "repos/${{ github.repository }}/git/commits/${main_sha}" --jq '.tree.sha')
+
+          if [ "${head_tree}" != "${main_tree}" ]; then
+            echo "::error::The promotion PR's tree does not match main's. Re-run promote-main-to-stable.yml to refresh the promotion branch."
+            exit 1
+          fi
+          echo "The promotion tree matches main."
+
+      # The repository's shell scripts are the *.sh files git tracks — the same
+      # definition `just lint` uses. validate-pr word-splits this input into
+      # shellcheck arguments.
+      - name: Resolve shellcheck scope
+        id: shell-scope
+        shell: bash
+        run: |
+          glob="$(git ls-files '*.sh' | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+          echo "glob=${glob}" >> "${GITHUB_OUTPUT}"
+          echo "Resolved shellcheck scope: ${glob}"
+
       - name: Validate
-        uses: projectbluefin/actions/bootc-build/validate-pr@e2ccd51b41d9bb3abd9caeac626fb15c95589c3c # v1
+        uses: projectbluefin/actions/bootc-build/validate-pr@837850b6100b22c7920476035e7e1c28fdbba67f # v1
         with:
-          shellcheck-glob: "build/*.sh"
+          shellcheck-glob: ${{ steps.shell-scope.outputs.glob }}
           dockerfile: "Containerfile"
-          hadolint-config: ".hadolint.yaml"
+          hadolint-config: ".github/hadolint.yaml"

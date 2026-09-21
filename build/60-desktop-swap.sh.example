@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+###############################################################################
+# Example: Replace GNOME with the COSMIC desktop
+###############################################################################
+# Swaps this image's GNOME session for System76's COSMIC. Both desktops live in
+# the official Fedora repositories, so nothing here needs a COPR or any other
+# third-party source.
+#
+# This is the destructive example. It removes GNOME rather than adding COSMIC
+# beside it. Fedora's supported way to get a COSMIC-only image is to build from
+# its own COSMIC base instead:
+#
+#   FROM quay.io/fedora-ostree-desktops/cosmic-atomic:44
+#
+# The FROM line is all it takes: the base image name and the Fedora major are
+# read from it. Use this script only when you want to keep the Silverblue base
+# and strip GNOME from it.
+#
+# Do not install the @cosmic-desktop-environment group. It is a full desktop
+# spin: LibreOffice, Firefox, printing and input methods, and it re-reasons
+# hundreds of packages that are already installed.
+#
+# To use this script:
+# 1. Rename it to remove the .example extension: 60-desktop-swap.sh
+# 2. Add the explicit RUN block from build/README.md for
+#    /ctx/build/60-desktop-swap.sh after the 20-packages-and-services.sh block
+#    and before the 90-cleanup.sh block in the Containerfile.
+#
+# Test in a VM before trusting it. An image with no display manager boots to a
+# black screen, and that is not something a container build can catch.
+###############################################################################
+
+echo "::group:: Install COSMIC"
+
+# cosmic-session pulls the compositor, panel, settings, files, terminal and,
+# with them, cosmic-greeter and xdg-desktop-portal-cosmic. The lines after it
+# are the genuinely optional apps.
+dnf5 install -y \
+	cosmic-session \
+	cosmic-edit \
+	cosmic-store \
+	cosmic-player \
+	cosmic-wallpapers
+
+echo "::endgroup::"
+
+echo "::group:: Remove GNOME"
+
+# gnome-session-wayland-session and gnome-classic-session own the files in
+# /usr/share/wayland-sessions. Leaving them behind would keep offering GNOME
+# sessions at the login screen that can no longer start. mutter and gnome-session
+# are removed too: without them nothing is left that could try to bring GNOME up.
+dnf5 remove -y \
+	gnome-shell \
+	"gnome-shell-extension*" \
+	mutter \
+	gnome-session \
+	gnome-session-wayland-session \
+	gnome-classic-session \
+	gnome-control-center \
+	gnome-software \
+	nautilus \
+	gdm
+
+echo "::endgroup::"
+
+echo "::group:: Switch the display manager"
+
+# gdm was removed above, so COSMIC's greeter takes over the display-manager
+# alias. cosmic-session already ships /usr/share/wayland-sessions/cosmic.desktop,
+# so there is no session file to write by hand.
+systemctl enable cosmic-greeter.service
+
+echo "::endgroup::"
