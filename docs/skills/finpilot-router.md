@@ -1,1 +1,0 @@
-../../.agents/skills/finpilot-router/SKILL.md

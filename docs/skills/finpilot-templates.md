@@ -1,1 +1,0 @@
-../../.agents/skills/finpilot-templates/SKILL.md

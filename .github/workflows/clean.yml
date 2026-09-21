@@ -17,21 +17,18 @@ jobs:
       contents: read
       packages: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
       - name: Resolve package name
         id: package
         shell: bash
         run: |
           # Derive the cleanup target from the repository name (lowercased),
-          # exactly as build-image.yml derives the publish target — so a
-          # renamed fork cleans the package it actually pushes (see #291).
+          # exactly as build-image.yml derives the publish target, so a renamed
+          # fork cleans the package it actually pushes.
           name="${{ github.event.repository.name }}"
           echo "name=${name,,}" >> "${GITHUB_OUTPUT}"
 
       - name: Cleanup old images
-        uses: projectbluefin/actions/bootc-build/ghcr-cleanup@e2ccd51b41d9bb3abd9caeac626fb15c95589c3c # v1
+        uses: projectbluefin/actions/bootc-build/ghcr-cleanup@837850b6100b22c7920476035e7e1c28fdbba67f # v1
         with:
           packages: ${{ steps.package.outputs.name }}
           older-than: 90 days

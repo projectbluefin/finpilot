@@ -7,7 +7,7 @@ on:
     paths:
       - "custom/brew/**"
       - "build/validate-brewfiles.sh"
-      - "tests/unit/validate-brewfiles_test.bats"
+      - "tests/contract/validate-brewfiles_test.bats"
       - ".github/workflows/validate-brewfiles.yml"
 jobs:
   validate:
@@ -18,7 +18,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Homebrew
-        uses: Homebrew/actions/setup-homebrew@f8d4222eb633e65c2a0157383cf80861fc7fae7f # master
+        uses: Homebrew/actions/setup-homebrew@848c272c7bfe984a197bd4d16383f4c106ec61e6 # main
 
       - name: Install just
         env:
@@ -37,7 +37,7 @@ jobs:
 
       # Static validation only: the recipe greps Brewfiles and passes names
       # to `brew info` as data. Never `brew bundle check` a PR-controlled
-      # Brewfile — it is a Ruby DSL and would execute in CI (see #288).
+      # Brewfile — it is a Ruby DSL and would execute in CI.
       - name: Validate Brewfiles
         shell: bash
         run: just validate-brewfiles

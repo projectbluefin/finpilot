@@ -1,95 +1,44 @@
-# Flatpak Preinstall Integration
+# Flatpak preinstall
 
-This directory contains Flatpak preinstall configuration files that will be copied into your custom image at `/usr/share/flatpak/preinstall.d/`.
+Declarations here are copied into the image at `/usr/share/flatpak/preinstall.d/`
+and read on first boot by `flatpak-preinstall.service`, which installs each app
+from Flathub. Nothing is embedded in the image or the ISO.
 
-## What is Flatpak Preinstall?
+## Files
 
-Flatpak preinstall is a feature that allows system administrators to define Flatpak applications that should be installed on first boot. These files are read by the Flatpak system integration and automatically install the specified applications.
+- `default.preinstall` — the apps installed on first boot
 
-## How It Works
+## Format
 
-1. **During Build**: Files in this directory are copied to `/usr/share/flatpak/preinstall.d/` in the image
-2. **On First Boot**: After user setup completes, the system reads these files and installs the specified Flatpaks
-3. **User Experience**: Applications appear automatically after first login
-
-## Important: Installation Timing
-
-**Flatpaks are NOT included in the ISO or container image.** They are downloaded and installed after:
-- User completes initial system setup
-- Network connection is established
-- First boot process runs `flatpak preinstall`
-
-This means:
-- The ISO remains small and bootable offline
-- Users need an internet connection after installation
-- First boot may take longer while Flatpaks download and install
-- This is NOT an offline ISO with pre-embedded applications
-
-## File Format
-
-Each file uses the INI format with `[Flatpak Preinstall NAME]` sections:
+An INI file, one section per app:
 
 ```ini
-[Flatpak Preinstall org.mozilla.firefox]
-Branch=stable
-
-[Flatpak Preinstall org.gnome.Calculator]
+[Flatpak Preinstall org.mozilla.Thunderbird]
 Branch=stable
 ```
 
-**Keys:**
-- `Install` - (boolean) Whether to install (default: true)
-- `Branch` - (string) Branch name (default: "master", commonly "stable")
-- `IsRuntime` - (boolean) Whether this is a runtime (default: false for apps)
-- `CollectionID` - (string) Collection ID of the remote, if any
+Keys: `Branch` (default `master`; use `stable`), `Install` (default true),
+`IsRuntime` (default false), and `CollectionID` (only for a remote that needs
+one).
 
-See: https://docs.flatpak.org/en/latest/flatpak-command-reference.html#flatpak-preinstall
+Two gotchas:
 
-## Usage
+- The parser is GKeyFile. Comments must start with `#`; a `;` line is a syntax
+  error, and flatpak discards the entire file when one line is malformed.
+- `just validate-flatpaks` checks every section for a `Branch=` key and confirms
+  the app exists on Flathub. CI runs it too.
 
-### Adding Flatpaks to Your Image
+## Adding one
 
-1. Edit [`default.preinstall`](default.preinstall) or create new `.preinstall` files in this directory
-2. Add Flatpak references in INI format with `[Flatpak Preinstall NAME]` sections
-3. Build your image - the files will be copied to `/usr/share/flatpak/preinstall.d/`
-4. After user setup completes, Flatpaks will be automatically installed
+Append a section to `default.preinstall`, or add another `.preinstall` file. Find
+the ID with `flatpak search`, or on [Flathub](https://flathub.org/).
 
-**Example Files in this directory:**
-- [`default.preinstall`](default.preinstall) - Core applications from Bluefin
+## First boot
 
-### Finding Flatpak IDs
+The Flathub remote comes from `/etc/flatpak/remotes.d/flathub.flatpakrepo`, which
+the build fetches, so there is nothing to add by hand.
 
-To find the ID of a Flatpak:
-```bash
-flatpak search app-name
-```
-
-Or browse Flathub: https://flathub.org/
-
-## Customization
-
-Edit the existing file or create new ones:
-- **[`default.preinstall`](default.preinstall)** - Modify the default application list
-- **Create new files:**
-  - `development.preinstall` - Development tools
-  - `gaming.preinstall` - Gaming applications
-  - `media.preinstall` - Media editing tools
-
-Each new `.preinstall` file will be automatically copied during the build process. See [`build/10-build.sh`](../../build/10-build.sh) for how files are copied.
-
-## Important Notes
-
-- Files must use the `.preinstall` extension
-- Comments can be added with `#`
-- Empty lines are ignored
-- **Flatpaks are downloaded from Flathub on first boot** - not embedded in the image
-- **Internet connection required** after installation for Flatpaks to install
-- Installation happens automatically after user setup completes
-- Users can still uninstall these applications if desired
-- First boot will take longer while Flatpaks are being installed
-
-## Resources
-
-- [Flatpak Documentation](https://docs.flatpak.org/)
-- [Flatpak Preinstall Reference](https://docs.flatpak.org/en/latest/flatpak-command-reference.html#flatpak-preinstall)
-- [Flathub](https://flathub.org/)
+`flatpak-preinstall.service` needs the network. When it cannot reach Flathub it
+logs a warning, installs nothing, and **still exits successfully**, so it does
+not retry that boot. If the first boot happened before Wi-Fi was configured,
+reboot once you are online and it will install.
