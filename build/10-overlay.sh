@@ -40,6 +40,15 @@ echo "::group:: Overlay shared Common runtime files"
 # Shared runtime substrate: the ujust entry point and wrapper, first-boot setup
 # hooks, container trust policy, and the Flatpak/Brew declarations these
 # services consume.
+#
+# /etc/containers/policy.json arrives here, and the template deliberately takes
+# it unmodified. Its sigstore scopes cover ghcr.io/ublue-os and
+# quay.io/toolbx-images; this image's own namespace matches the `""` catch-all
+# (insecureAcceptAnything), which is why 00-image-info.sh writes an unverified
+# update transport. Merging a scope for this namespace — with jq, never by
+# forking the file through custom/files, which would freeze every inherited
+# scope — is only worth doing once the image is signed with a key the policy
+# can name; a keyless GitHub Actions identity is unmatchable here.
 rsync -rvK /ctx/oci/common/shared/ /
 
 echo "::endgroup::"
