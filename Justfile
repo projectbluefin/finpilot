@@ -343,6 +343,13 @@ _build-bib $target_image $tag $type $config: (_rootful_load_image target_image t
       "${build_image}"
 
     mkdir -p output
+    # `mv` cannot replace an existing directory (`-f` only suppresses the
+    # overwrite prompt for files), so a second build of the same type would
+    # fail here and the EXIT trap would throw the finished disk away. Clear
+    # the destination directories for the artifacts we are about to move in.
+    for artifact in "${BUILDTMP}"/*; do
+        sudo rm -rf "output/$(basename "${artifact}")"
+    done
     sudo mv -f "${BUILDTMP}"/* output/
     sudo rmdir "${BUILDTMP}"
     # `id` rather than `$USER`: these recipes run under `set -u` from cron,
