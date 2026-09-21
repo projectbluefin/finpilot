@@ -183,9 +183,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          # The same trust boundary the scheduled approver documents: only runs
-          # on the bot-owned promotion branch, from the bot itself. Those
-          # branches carry only commits that already passed their own PR checks.
+          # Trust boundary: only runs on the bot-owned promotion branch, from
+          # the bot itself. Those branches carry only commits that already
+          # passed their own PR checks.
           runs_filter=".workflow_runs[] | select(.head_branch == \"${PROMOTION_BRANCH}\") | select(.actor.login == \"github-actions[bot]\") | .id"
 
           approved=0
@@ -215,7 +215,7 @@ jobs:
           done
 
           if [ "${approved}" -eq 0 ]; then
-            echo "::notice::No pending runs matched; the scheduled approver remains the backstop."
+            echo "::notice::No pending runs matched; approve any missed run from its page in the Actions tab."
           fi
 
   # The reusable's own release gate sits behind `enqueue_promotion`, which is off
