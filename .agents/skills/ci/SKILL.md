@@ -71,7 +71,11 @@ GitHub Actions to SHAs and updates image digests. The policy lives in
 majors wait for a pull request.
 
 Renovate needs the `RENOVATE_TOKEN` secret and auto-merge enabled. Both are
-onboarding steps.
+onboarding steps. The secret is optional: with it unset the workflow logs a skip
+and the run stays green, which is how upstream runs, where an org-wide app does
+the work instead. The check sits in its own `token` job because a job that calls
+a reusable workflow cannot hold steps, and `jobs.<job_id>.if` cannot read the
+secrets context — `secrets` in a job-level `if` is a parse error, not a skip.
 
 Automerge deliberately covers GitHub Actions SHA bumps, which reverses a guard
 upstream kept. Those SHAs run in jobs holding `packages: write`,

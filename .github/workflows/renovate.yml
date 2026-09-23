@@ -14,7 +14,32 @@ on:
 permissions: {}
 
 jobs:
+  # A job that calls a reusable workflow cannot hold steps, and
+  # `jobs.<job_id>.if` cannot read the secrets context, so the token check needs
+  # a job of its own to pass the answer on.
+  token:
+    name: Check for a Renovate token
+    runs-on: ubuntu-latest
+    permissions: {}
+    outputs:
+      configured: ${{ steps.check.outputs.configured }}
+    steps:
+      - name: Check for RENOVATE_TOKEN
+        id: check
+        shell: bash
+        env:
+          TOKEN: ${{ secrets.RENOVATE_TOKEN }}
+        run: |
+          if [[ -z "${TOKEN}" ]]; then
+            echo "RENOVATE_TOKEN is not set — skipping Renovate."
+            echo "configured=false" >> "${GITHUB_OUTPUT}"
+          else
+            echo "configured=true" >> "${GITHUB_OUTPUT}"
+          fi
+
   renovate:
+    needs: token
+    if: needs.token.outputs.configured == 'true'
     permissions:
       contents: read
     uses: projectbluefin/actions/.github/workflows/reusable-renovate.yml@837850b6100b22c7920476035e7e1c28fdbba67f # v1
