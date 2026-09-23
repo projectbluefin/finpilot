@@ -40,7 +40,29 @@ if [[ -z "${FEDORA_MAJOR_VERSION:-}" && -r "${OS_RELEASE}" ]]; then
 fi
 : "${FEDORA_MAJOR_VERSION:?FEDORA_MAJOR_VERSION must be set or derivable from ${OS_RELEASE}}"
 
-IMAGE_REF="ostree-image-signed:docker://ghcr.io/${IMAGE_VENDOR}/${IMAGE_NAME}"
+# The update source, and deliberately an *unverified* transport: nothing on an
+# installed system can check this image's signature, so claiming otherwise would
+# be decorative.
+#
+# `ostree-image-signed:` means "verify against /etc/containers/policy.json
+# first". That policy comes from Common's shared overlay (10-overlay.sh), whose
+# only sigstore scopes are ghcr.io/ublue-os and quay.io/toolbx-images; this
+# namespace falls through to the `""` catch-all, which is
+# insecureAcceptAnything. A signed transport would therefore report success
+# without checking anything.
+#
+# Adding a scope would not fix it either, because the image is signed keyless:
+# the identity lives in a URI SAN
+# (https://github.com/${IMAGE_VENDOR}/${IMAGE_NAME}/.github/workflows/...), and
+# containers/image matches a Fulcio certificate on `subjectEmail` alone —
+# mandatory, exact, with an explicit FIXME for URI SANs in
+# signature/fulcio_cert.go. A GitHub Actions certificate carries no email SAN,
+# so no policy entry can match one. Device-side enforcement needs key-based
+# signing first; see README "Image signing".
+#
+# Keep the docker:// spelling: the ISO path in the Justfile strips the transport
+# with `sed 's|.*docker://||'` to recover the published reference.
+IMAGE_REF="ostree-unverified-image:docker://ghcr.io/${IMAGE_VENDOR}/${IMAGE_NAME}"
 
 json_escape() {
     local value=$1

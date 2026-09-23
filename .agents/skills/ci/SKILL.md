@@ -58,6 +58,20 @@ Keyless OIDC via Cosign. There are no keys to generate or store; the workflow
 needs `id-token: write` and `packages: write`. Unsigned images fail the promotion
 gate. The README has the command to verify an image.
 
+The promotion gate is the *only* enforcement point. Nothing checks the signature
+on an installed system, so `00-image-info.sh` writes an unverified update
+transport (`ostree-unverified-image:docker://…`) and the README says so.
+`ostree-image-signed:` would send the client to `/etc/containers/policy.json`,
+which Common supplies with no scope for this namespace — it would verify against
+the `""` catch-all, `insecureAcceptAnything`, and report success having checked
+nothing. Adding a scope does not rescue it while signing stays keyless:
+containers/image matches a Fulcio certificate on `subjectEmail` alone
+(mandatory, exact, with a standing FIXME for URI SANs in
+`signature/fulcio_cert.go`), and a GitHub Actions certificate names its workflow
+in a URI SAN with no email to match. Device-side verification is a key-based
+signing change first, a policy change second.
+`tests/contract/image-signing_test.bats` fails if either side moves alone.
+
 The identity regexp the release workflows pass to the reusables is scoped with
 `github.repository`, not `github.repository_owner`. Matching the owner and then
 any repository accepts a signature minted by any repository in the org, and

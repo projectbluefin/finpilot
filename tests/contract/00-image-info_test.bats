@@ -57,7 +57,7 @@ json_field() {
     [ "$status" -eq 0 ]
     [ "$(json_field image-name)" = "finpilot" ]
     [ "$(json_field image-vendor)" = "projectbluefin" ]
-    [ "$(json_field image-ref)" = "ostree-image-signed:docker://ghcr.io/projectbluefin/finpilot" ]
+    [ "$(json_field image-ref)" = "ostree-unverified-image:docker://ghcr.io/projectbluefin/finpilot" ]
     [ "$(json_field image-tag)" = "stable" ]
     [ "$(json_field base-image-name)" = "silverblue" ]
     [ "$(json_field fedora-version)" = "44" ]
@@ -67,7 +67,7 @@ json_field() {
     export IMAGE_NAME="finpilot-nvidia"
     run_script
     [ "$status" -eq 0 ]
-    [ "$(json_field image-ref)" = "ostree-image-signed:docker://ghcr.io/projectbluefin/finpilot-nvidia" ]
+    [ "$(json_field image-ref)" = "ostree-unverified-image:docker://ghcr.io/projectbluefin/finpilot-nvidia" ]
     run python3 -c 'import json,sys; sys.exit("image-flavor" in json.load(open(sys.argv[1])))' "${IMAGE_INFO_JSON}"
     [ "$status" -eq 0 ]
 }
