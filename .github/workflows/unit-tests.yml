@@ -13,6 +13,7 @@ on:
     branches: [main, stable]
     paths-ignore:
       - "**.md"
+  merge_group:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
@@ -38,8 +39,11 @@ jobs:
           set -euo pipefail
           base="https://github.com/casey/just/releases/download/${JUST_VERSION}"
           asset="just-${JUST_VERSION}-x86_64-unknown-linux-musl.tar.gz"
-          curl -sSfL -o "${asset}" "${base}/${asset}"
-          curl -sSfL -o SHA256SUMS "${base}/SHA256SUMS"
+          # --retry-all-errors covers non-2xx statuses like a 504 from the release
+          # CDN; --retry alone only retries transient/network errors. --retry-delay
+          # spaces the attempts so a briefly unhealthy CDN is not failed immediately.
+          curl -sSfL --retry 5 --retry-delay 3 --retry-all-errors -o "${asset}" "${base}/${asset}"
+          curl -sSfL --retry 5 --retry-delay 3 --retry-all-errors -o SHA256SUMS "${base}/SHA256SUMS"
           grep -F "${asset}" SHA256SUMS | sha256sum -c -
           tar xzf "${asset}" -C /tmp just
           sudo install -m 0755 /tmp/just /usr/local/bin/just

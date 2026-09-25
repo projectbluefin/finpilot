@@ -33,7 +33,8 @@ CI runs the same checks; running them locally only makes the pull request quiet.
 | Symptom | Cause | Fix |
 |---|---|---|
 | `validate` never runs | branch protection names a check no workflow produces | the context must be exactly `validate` |
-| Renovate opens nothing | `RENOVATE_TOKEN` is missing or lacks the `workflow` scope | recreate the token |
+| Renovate logs a skip and opens nothing | `RENOVATE_TOKEN` is not set | expected; set the secret to turn Renovate on |
+| Renovate fails on `Validate RENOVATE_TOKEN` | the token is expired or lacks the `workflow` scope | recreate the token |
 | the promotion PR never opens | `stable` does not exist | create the branch |
 | the promotion PR will not merge | `stable` requires an approval | set required approvals to 0 |
 | a Renovate PR waits forever | auto-merge is off | enable it in Settings |

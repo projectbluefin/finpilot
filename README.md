@@ -66,7 +66,8 @@ _Last updated: [date]_
 - Images older than 90 days pruned automatically
 - Pull requests validated for shellcheck, hadolint, Brewfiles, Flatpaks,
   Justfiles, and Renovate config
-- Keyless OIDC signing on every published image
+- Keyless OIDC signing on every published image, enforced at promotion
+  ([where the signature is checked](#where-the-signature-is-checked))
 
 **Runtime**
 
@@ -122,6 +123,34 @@ cosign verify \
 
 Unsigned images fail the promotion gate, so `main → stable` reports
 `release/blocked` until signing is restored.
+
+### Where the signature is checked
+
+**In CI, on the way to `:stable` — and not verified on the device.** The
+promotion gate is the only enforcement point. An installed system pulls its
+updates over an unverified transport (`image-info.json`'s `image-ref` is
+`ostree-unverified-image:docker://…`), so `bootc upgrade` does not check the
+cosign signature.
+
+That is a deliberate statement of what the image can actually do, not an
+oversight. Device-side verification runs through
+`/etc/containers/policy.json`, which matches a keyless Fulcio certificate on
+`subjectEmail` only — mandatory and exact. A GitHub Actions certificate
+identifies its workflow in a URI SAN and carries no email, so no policy entry
+can match it, and the inherited policy's `""` catch-all
+(`insecureAcceptAnything`) would accept the image regardless. A signed-looking
+`image-ref` here would verify nothing while implying it verified something.
+
+Making updates verify on the device means signing with a key the policy can
+name: publish with a cosign keypair, merge a `sigstoreSigned` scope for your
+namespace into the inherited policy (with `jq`, during
+[`build/10-overlay.sh`](build/10-overlay.sh) — never by shipping a whole
+`policy.json` through `custom/files/`, which freezes every scope you inherited),
+add a `registries.d` entry with `use-sigstore-attachments: true` for it, and
+flip `IMAGE_REF` back to `ostree-image-signed:`. Validate that on a real
+install before shipping it: a scope that does not match turns `bootc upgrade`
+into a hard refusal. `tests/contract/image-signing_test.bats` holds the two
+sides together, so changing one without the other fails the suite.
 
 ## Using your image
 

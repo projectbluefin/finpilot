@@ -2,7 +2,7 @@ export IMAGE_NAME := env("IMAGE_NAME", "finpilot")
 export DEFAULT_TAG := env("DEFAULT_TAG", "stable")
 export PODMAN := env("PODMAN", "podman")
 export REPO_ORG := env("GITHUB_REPOSITORY_OWNER", "projectbluefin")
-export bib_image := env("BIB_IMAGE", "ghcr.io/osbuild/bootc-image-builder:latest@sha256:0d9d2d38f1d245d4d658a838f41d0e44e40f6be97b9912148b3e7137270077fa")
+export bib_image := env("BIB_IMAGE", "ghcr.io/osbuild/bootc-image-builder:latest@sha256:0daf70630fbd7ef8a94571d3e50a77c3f8a3b812f67ec2d71f52e4c8ba83985c")
 export qemu_image := env("QEMU_IMAGE", "ghcr.io/qemus/qemu:7.50@sha256:e7f6fda52503a546fd649670ba46e4bc23dc6dcef275bc3fac48877fbbc430df")
 export vm_ram := env("VM_RAM", "8192")
 export vm_cpus := env("VM_CPUS", "4")
@@ -107,22 +107,24 @@ sudo-clean:
 
 # sudoif bash function
 [group('Utility')]
+[positional-arguments]
 [private]
 sudoif command *args:
     #!/usr/bin/bash
     function sudoif(){
+        local sudo_bin
+        sudo_bin="$(command -v sudo || true)"
         if [[ "${UID}" -eq 0 ]]; then
             "$@"
-        elif [[ "$(command -v sudo)" && -n "${SSH_ASKPASS:-}" ]] && [[ -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLAY:-}" ]]; then
-            /usr/bin/sudo --askpass "$@" || exit 1
-        elif [[ "$(command -v sudo)" ]]; then
-            /usr/bin/sudo "$@" || exit 1
+        elif [[ -n "${sudo_bin}" && -n "${SSH_ASKPASS:-}" ]] && [[ -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLAY:-}" ]]; then
+            "${sudo_bin}" --askpass "$@" || exit 1
+        elif [[ -n "${sudo_bin}" ]]; then
+            "${sudo_bin}" "$@" || exit 1
         else
             exit 1
         fi
     }
-    sudoif {{ command }} {{ args }}
-
+    sudoif "$@"
 # Build the container image with Podman.
 #
 # Arguments:
@@ -343,6 +345,13 @@ _build-bib $target_image $tag $type $config: (_rootful_load_image target_image t
       "${build_image}"
 
     mkdir -p output
+    # `mv` cannot replace an existing directory (`-f` only suppresses the
+    # overwrite prompt for files), so a second build of the same type would
+    # fail here and the EXIT trap would throw the finished disk away. Clear
+    # the destination directories for the artifacts we are about to move in.
+    for artifact in "${BUILDTMP}"/*; do
+        sudo rm -rf "output/$(basename "${artifact}")"
+    done
     sudo mv -f "${BUILDTMP}"/* output/
     sudo rmdir "${BUILDTMP}"
     # `id` rather than `$USER`: these recipes run under `set -u` from cron,

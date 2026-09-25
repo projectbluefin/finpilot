@@ -77,6 +77,9 @@ runs GitHub holds for its own pull request.
 The one step with no shortcut. Renovate uses this token to push branches and
 open pull requests, so it needs to act as you.
 
+Skip this step if you do not want Renovate. Without the secret the workflow logs
+a skip and the run stays green; nothing else in the image depends on it.
+
 ### Create the token
 
 1. On any GitHub page, click your profile picture in the top right, then
