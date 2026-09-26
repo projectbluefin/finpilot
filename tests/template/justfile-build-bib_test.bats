@@ -24,6 +24,8 @@
 # `unshare -r` user namespace, where the caller is uid 0 and that root branch is
 # taken. Hosts without unprivileged user namespaces skip rather than escalate.
 #
+# Note: GitHub Actions hosted runners lack unprivileged user namespaces by default,
+# so these 22 cases will skip in standard CI and run in environments with userns enabled.
 # Run with: bats tests/template/justfile-build-bib_test.bats
 
 SCRIPT_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")" && pwd)"
@@ -199,8 +201,10 @@ bib_run_args() {
     # from the tag the caller named.
     run_just build-qcow2
     [ "$status" -eq 0 ]
-    ! grep -q 'image-info.json' "${PODMAN_LOG}"
-    ! grep -q '^tag ' "${PODMAN_LOG}"
+    run grep -q 'image-info.json' "${PODMAN_LOG}"
+    [ "$status" -ne 0 ]
+    run grep -q '^tag ' "${PODMAN_LOG}"
+    [ "$status" -ne 0 ]
     [[ "$(bib_run_args)" == *"localhost/finpilot:stable"* ]]
 }
 
@@ -296,15 +300,18 @@ bib_run_args() {
     # whole defence; its contents are deliberately only a comment.
     grep -qF '[customizations.installer.kickstart]' "${REPO_ROOT}/iso/iso.toml"
     grep -qF 'contents = """' "${REPO_ROOT}/iso/iso.toml"
-    ! grep -qE '^[^#]*clearpart' "${REPO_ROOT}/iso/iso.toml"
-    ! grep -qE '^[^#]*autopart' "${REPO_ROOT}/iso/iso.toml"
+    run grep -qE '^[^#]*clearpart' "${REPO_ROOT}/iso/iso.toml"
+    [ "$status" -ne 0 ]
+    run grep -qE '^[^#]*autopart' "${REPO_ROOT}/iso/iso.toml"
+    [ "$status" -ne 0 ]
 }
 
 @test "iso/iso.toml carries no image reference" {
     # The Justfile comment at _build-bib states that the published reference
     # has exactly one source, image-info.json. A reference restated here is a
     # second one that drifts silently on a fork.
-    ! grep -qE '^[^#]*(ghcr\.io|quay\.io|docker://|image-ref)' "${REPO_ROOT}/iso/iso.toml"
+    run grep -qE '^[^#]*(ghcr\.io|quay\.io|docker://|image-ref)' "${REPO_ROOT}/iso/iso.toml"
+    [ "$status" -ne 0 ]
 }
 
 @test "iso/iso.toml disables the Subscription module and enables Timezone" {
