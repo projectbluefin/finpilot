@@ -248,3 +248,95 @@ jobs:
       # e2e is ever enabled for this image.
       run_e2e: false
     secrets: inherit
+
+  # The reusable renders a `## Desktop Screenshot` section into every promotion
+  # PR body, sourced from `${PRIMARY_IMAGE}-smoke-latest.png` on the testsuite
+  # pages site. finpilot does not run an e2e suite (`run_e2e: false` above, and
+  # nothing passes `e2e_image` to the reusable), so the smoke image is never
+  # produced and the URL 404s. Strip the section here once `gate` has refreshed
+  # the gate section, so the cosmetic noise does not survive into the PR an
+  # operator reads. Skipped on a no-op run that opened no PR or on a skipped
+  # gate (no need to edit before verification). Runs on a *failed* gate as
+  # well: a `needs` chain already serialises the jobs, so there is no race,
+  # and the operator who triages a failed-gate PR benefits from the same
+  # cleanup. Idempotent on re-runs (no edit when the section is already
+  # absent).
+  #
+  # Note: this also drops the merge-policy blockquote the reusable renders
+  # inside `## Desktop Screenshot`. finpilot merges by hand rather than via
+  # `enqueue_promotion` (a personal fork cannot use a merge queue), so the
+  # blockquote advertising auto-merge was wrong anyway; #467 pins
+  # `auto_merge: false` in the reusable's input so render-pr-body stops
+  # emitting the misleading text for this image.
+  strip-screenshot-section:
+    name: Drop the broken Desktop Screenshot section
+    needs: [locate-promotion-pr, gate]
+    if: always() && needs.locate-promotion-pr.outputs.pr_number != '' && needs.gate.result != 'skipped'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PR_NUMBER: ${{ needs.locate-promotion-pr.outputs.pr_number }}
+    steps:
+      - name: Strip the Desktop Screenshot section from the promotion PR body
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Read the body the reusable rendered. gh's body field is a JSON
+          # string, so jq unwraps it to a file the next step can edit.
+          orig_body="$(mktemp)"
+          stripped_body="$(mktemp)"
+          trap 'rm -f "${orig_body}" "${stripped_body}"' EXIT
+
+          gh pr view "${PR_NUMBER}" \
+            --repo "${{ github.repository }}" \
+            --json body \
+            --jq '.body' > "${orig_body}"
+
+          # GitHub normalises PR bodies edited through the web UI to CRLF.
+          # The reusable re-renders with LF on every run, so the section
+          # heading normally matches; bodies edited by hand would not.
+          # Strip the carriage returns so the heading match below works
+          # regardless of how the body was last edited (#466 review).
+          tr -d '\r' < "${orig_body}" > "${orig_body}.lf"
+          mv "${orig_body}.lf" "${orig_body}"
+
+          # The section is emitted by render-pr-body/action.yml as a single
+          # `## Desktop Screenshot` heading followed by a CAUTION/IMPORTANT
+          # blockquote and a markdown image. The 404 image is what makes
+          # the section useless to operators; the blockquote carries the
+          # merge-policy note ("merged by a human" / "do not auto-merge")
+          # that #467 makes correct upstream, so keep it (#466 review).
+          if ! grep -q '^## Desktop Screenshot$' "${orig_body}"; then
+            echo "::notice::PR #${PR_NUMBER} has no Desktop Screenshot section; nothing to strip."
+            exit 0
+          fi
+
+          # Drop the heading line and the markdown image reference emitted by
+          # render-pr-body, then trim trailing blank lines so the body does
+          # not end with stray whitespace. The blockquote between them is
+          # preserved so the merge-policy note ("merged by a human" /
+          # "do not auto-merge") stays -- once #467 lands upstream, that
+          # note becomes the correct operator-facing text. A `cmp -s`
+          # "no-op guard" would be dead code: the early grep short-circuits
+          # when the section is absent, and the awk below always emits a
+          # body shorter than the input when it is present.
+          awk '
+            /^## Desktop Screenshot$/ { skip_section = 1; next }
+            /^!\[.*\]\(.*\)$/ && skip_section { skip_section = 0; next }
+            { lines[NR] = $0; total = NR }
+            END {
+              last = total
+              while (last > 0 && lines[last] == "") last--
+              for (i = 1; i <= last; i++) print lines[i]
+            }
+          ' "${orig_body}" > "${stripped_body}"
+
+          gh pr edit "${PR_NUMBER}" \
+            --repo "${{ github.repository }}" \
+            --body-file "${stripped_body}"
+          echo "Stripped the Desktop Screenshot section from PR #${PR_NUMBER}."
