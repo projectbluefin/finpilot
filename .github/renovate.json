@@ -46,6 +46,13 @@
       "automerge": true
     },
     {
+      "description": "Cap the Fedora base at the latest stable major (44) so Renovate advances to the next stable release instead of jumping to the next rawhide-stage tag. The docker versioning used by quay.io/fedora-ostree-desktops/* rejects the non-numeric 'rawhide' tag before allowedVersions is consulted, so without a constraint Renovate proposes the highest numeric tag (46, currently rawhide-stage) and, with recreateWhen:always, recreates an immortal PR there instead of advancing to 44. Raise the cap after each Fedora GA.",
+      "matchDepNames": [
+        "quay.io/fedora-ostree-desktops/*"
+      ],
+      "allowedVersions": "<=44"
+    },
+    {
       "description": "Third-party GitHub Actions execute in workflows holding packages:write and the cosign OIDC signing identity (build-image.yml), so their bumps always wait for a human — an automerged compromised release would run there unreviewed. First-party projectbluefin/** actions stay automerged.",
       "matchManagers": ["github-actions"],
       "matchPackageNames": ["!projectbluefin/**"],
