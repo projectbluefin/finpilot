@@ -46,6 +46,12 @@
       "automerge": true
     },
     {
+      "description": "Hold quay.io/fedora-ostree-desktops/* at its currently pinned major. The repository tags every active branch — `43`/`44` (released), `45`/`46` (pending) — and the docker versioning parses all of them as version candidates, so a cross-major pin would jump to an unreleased release the build has not been validated against. Disable the major outright, the same way the Ubuntu rule below does, rather than filtering with allowedVersions, whose regex/range syntax does not enforce a major ceiling here. The pin/digest bumps within the pinned major still automerge from the rule above.",
+      "matchDepNames": ["quay.io/fedora-ostree-desktops/*"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    },
+    {
       "description": "Third-party GitHub Actions execute in workflows holding packages:write and the cosign OIDC signing identity (build-image.yml), so their bumps always wait for a human — an automerged compromised release would run there unreviewed. First-party projectbluefin/** actions stay automerged.",
       "matchManagers": ["github-actions"],
       "matchPackageNames": ["!projectbluefin/**"],

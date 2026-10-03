@@ -82,7 +82,10 @@ any repository accepts a signature minted by any repository in the org, and
 Self-hosted through `projectbluefin/actions`, running every six hours. It pins
 GitHub Actions to SHAs and updates image digests. The policy lives in
 `.github/renovate.json`: updates below a major automerge once checks pass;
-majors wait for a pull request.
+majors wait for a pull request — except `quay.io/fedora-ostree-desktops/*`,
+where cross-major bumps do not open a PR at all (the rule is `enabled: false`).
+A Fedora major rebase for that namespace is a deliberate manual step: bump the
+tag in `Containerfile` by hand when the next major is released and validated.
 
 Renovate needs the `RENOVATE_TOKEN` secret and auto-merge enabled. Both are
 onboarding steps. The secret is optional: with it unset the workflow logs a skip
