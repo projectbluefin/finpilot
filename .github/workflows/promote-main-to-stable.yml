@@ -67,6 +67,14 @@ jobs:
       # by a person fires both, which is why this PR is merged in the UI rather
       # than by a bot.
       enqueue_promotion: false
+      # auto_merge controls how the rendered PR body describes this promotion,
+      # not whether anything enrolls it: enrollment is already pinned off by
+      # enqueue_promotion: false above. The reusable's render-pr-body step emits
+      # the "Auto-merge scheduled for Tuesday 04:00 UTC ... add do-not-merge
+      # label" CAUTION whenever auto_merge defaults true, which would mislead
+      # operators into blocking it on a schedule that never fires — finpilot's
+      # PR is merged by a human from the UI, so the body must say so.
+      auto_merge: false
       # Personal-account forks do not have an <owner>/maintainers team.
       # Organization forks can enable this and optionally set `reviewer`.
       request_reviewer: false
