@@ -15,6 +15,11 @@ set -euo pipefail
 #
 #   FROM quay.io/fedora-ostree-desktops/cosmic-atomic:44
 #
+# NOTE: keep the Fedora major here in step with the Containerfile base image.
+# Renovate updates the Containerfile's FROM line but does not manage .example
+# files, so this comment drifts on its own. Bump it whenever the base major
+# changes (for example, when the image moves from :44 to :45).
+#
 # The FROM line is all it takes: the base image name and the Fedora major are
 # read from it. Use this script only when you want to keep the Silverblue base
 # and strip GNOME from it.

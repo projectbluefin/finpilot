@@ -42,6 +42,6 @@ jobs:
     if: needs.token.outputs.configured == 'true'
     permissions:
       contents: read
-    uses: projectbluefin/actions/.github/workflows/reusable-renovate.yml@0642c0d2a58c8e7bf4f426d41ed76a33bbd9559f # v1
+    uses: projectbluefin/actions/.github/workflows/reusable-renovate.yml@e1e7f38c35e681f309fee7893f6f6780c23e3bb4 # v1
     secrets:
       renovate_token: ${{ secrets.RENOVATE_TOKEN }}

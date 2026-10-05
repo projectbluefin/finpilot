@@ -36,7 +36,7 @@ concurrency:
 jobs:
   promote:
     name: Promote main to stable
-    uses: projectbluefin/actions/.github/workflows/reusable-promote-squash.yml@0642c0d2a58c8e7bf4f426d41ed76a33bbd9559f # v1
+    uses: projectbluefin/actions/.github/workflows/reusable-promote-squash.yml@e1e7f38c35e681f309fee7893f6f6780c23e3bb4 # v1
     with:
       variants: >-
         [{"image":"${{ github.event.repository.name }}"}]
@@ -53,6 +53,14 @@ jobs:
       # The only path that auto-enrolls the PR is a merge queue, which needs an
       # organization-owned repository. Personal-account forks cannot use one.
       use_merge_queue: false
+      # The reusable renders the promotion PR body from `auto_merge`, not
+      # `use_merge_queue`: `auto_merge` states how the PR is merged at all.
+      # It defaults to true, so without this the body advertises an auto-merge
+      # schedule (bluefin/dakota Tuesday, bluefin-lts Thursday) that never runs
+      # here — finpilot is a personal fork merged by hand. Operators waiting for
+      # that auto-merge never see one, so set it false to match the manual merge
+      # below. Enrollment stays governed separately by enqueue_promotion.
+      auto_merge: false
       # Enrolling without a merge queue runs `gh pr merge --auto` with no merge
       # method, and GitHub CLI refuses that without a TTY ("--merge, --rebase,
       # or --squash required when not running interactively"). The reusable
@@ -233,7 +241,7 @@ jobs:
       issues: write
       packages: read
       pull-requests: write
-    uses: projectbluefin/actions/.github/workflows/reusable-release-gate.yml@0642c0d2a58c8e7bf4f426d41ed76a33bbd9559f # v1
+    uses: projectbluefin/actions/.github/workflows/reusable-release-gate.yml@e1e7f38c35e681f309fee7893f6f6780c23e3bb4 # v1
     with:
       repo: ${{ github.repository }}
       pr_number: ${{ needs.locate-promotion-pr.outputs.pr_number }}
