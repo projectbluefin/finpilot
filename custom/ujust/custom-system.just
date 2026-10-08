@@ -22,12 +22,23 @@ configure-dev-groups:
     DEV_GROUPS=(docker libvirt)
     MISSING=()
 
+    # Compare whole group names: a word match would count membership of
+    # docker-users or libvirt-dev as membership of docker or libvirt.
+    read -r -a USER_GROUPS <<<"$(id -nG "${CURRENT_USER}")"
+
     for group in "${DEV_GROUPS[@]}"; do
         if ! getent group "${group}" >/dev/null; then
             echo "Creating the ${group} group"
             sudo groupadd --system "${group}"
         fi
-        if ! id -nG "${CURRENT_USER}" | grep -qw "${group}"; then
+        member=0
+        for user_group in "${USER_GROUPS[@]}"; do
+            if [[ "${user_group}" == "${group}" ]]; then
+                member=1
+                break
+            fi
+        done
+        if ((member == 0)); then
             MISSING+=("${group}")
         fi
     done
@@ -119,7 +130,7 @@ install-config:
                 n=$((n + 1))
             done
             mv "${target}" "${backup}"
-            backed_up+=("${relative}")
+            backed_up+=("${backup#"${USER_CONFIG}"/}")
         fi
 
         cp "${file}" "${target}"
@@ -131,7 +142,5 @@ install-config:
     if ((${#backed_up[@]})); then
         echo
         echo "Backed up:"
-        for entry in "${backed_up[@]}"; do
-            echo "  - ${entry}.backup.${TIMESTAMP}"
-        done
+        printf '  - %s\n' "${backed_up[@]}"
     fi
