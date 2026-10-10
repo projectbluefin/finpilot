@@ -49,7 +49,25 @@ jobs:
           sudo install -m 0755 /tmp/just /usr/local/bin/just
           just --version
       - name: Install bats
-        run: sudo apt-get update && sudo apt-get install -y bats
+        # A bare `apt-get` against the runner image's stock sources can hang on
+        # a slow-but-alive mirror long enough to trip the 10-minute job
+        # timeout (issue #497 — cancelled at the Install bats step while
+        # retrying archive.ubuntu.com). Per-command inactivity timeouts bound
+        # the wait from both halves of the step, and a wall-clock `timeout`
+        # fronts a hard cap that fires on a slow-but-progressing socket too;
+        # `--no-install-recommends` skips `bats-doc`; `-qq` keeps the log
+        # readable.
+        run: |
+          set -o pipefail
+          sudo timeout 180 apt-get update -qq \
+            -o Acquire::http::Timeout=30 \
+            -o Acquire::https::Timeout=30 \
+            -o Acquire::Retries=2
+          sudo timeout 180 apt-get install -y --no-install-recommends \
+            -o Acquire::http::Timeout=30 \
+            -o Acquire::https::Timeout=30 \
+            -o Acquire::Retries=2 \
+            bats
       - name: Run unit tests
         # `just test-unit` is the single definition of how the suite runs.
         run: just test-unit
