@@ -204,8 +204,12 @@ Branch=stable
 EOF
     run bash "${SCRIPT}" "${FIXTURES}"
     [ "${status}" -eq 0 ]
-    run grep -c '^remote-add --user --if-not-exists flathub ' "${CALLS}"
+    # The remote is added from the checked-in fixture, never the live URL: the
+    # whole point of #493 is that the descriptor is pinned, not fetched.
+    run grep -c '^remote-add --user --if-not-exists flathub .*fixtures/flathub.flatpakrepo$' "${CALLS}"
     [ "${output}" = "1" ]
+    run grep -c '^remote-add --user --if-not-exists flathub https://dl.flathub.org' "${CALLS}"
+    [ "${output}" = "0" ]
     run grep -c '^remote-info --user flathub org.gnome.Calculator//stable$' "${CALLS}"
     [ "${output}" = "1" ]
 }

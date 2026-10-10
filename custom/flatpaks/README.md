@@ -39,7 +39,9 @@ The Flathub remote comes from `/etc/flatpak/remotes.d/flathub.flatpakrepo`, whic
 the build fetches and checks against the sha256 pinned in `build/10-overlay.sh`
 (the descriptor carries the `Url=` and `GPGKey=` every Flatpak is verified
 against), so there is nothing to add by hand. `tests/fixtures/flathub.flatpakrepo`
-is the pinned copy; refresh both together if Flathub ever rotates it.
+is the pinned copy, and `build/validate-flatpaks.sh` adds the remote from it
+rather than the live URL; refresh the fixture and the sha256 together if Flathub
+ever rotates it.
 
 `flatpak-preinstall.service` needs the network. When it cannot reach Flathub it
 logs a warning, installs nothing, and **still exits successfully**, so it does
