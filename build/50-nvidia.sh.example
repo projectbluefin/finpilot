@@ -36,7 +36,40 @@ echo "::group:: Pull the pre-built kernel modules"
 # The tag has to match the base image's kernel exactly. akmods is built daily
 # and the base weekly, so there is a window where this pull has nothing to fetch.
 dnf5 install -y skopeo jq
-skopeo copy --retry-times 3 "docker://ghcr.io/ublue-os/akmods-nvidia-open:${AKMODS_TAG}" dir:/tmp/akmods-rpms
+
+# The akmods image carries kernel modules and the driver RPMs that
+# nvidia-install.sh installs as root, so the pull only accepts content signed by
+# ublue-os/akmods. The key is build/akmods-cosign.pub, a copy of the repository's
+# cosign.pub, so a registry or tag that is not theirs cannot supply the modules.
+# The signature names the floating `main-NN` reference while the pull is the
+# kernel-exact tag, so the identity is matched by repository, not by tag.
+AKMODS_IMAGE="ghcr.io/ublue-os/akmods-nvidia-open"
+mkdir -p /tmp/akmods-policy/registries.d
+cat >/tmp/akmods-policy/policy.json <<EOF
+{
+  "default": [{"type": "reject"}],
+  "transports": {
+    "docker": {
+      "${AKMODS_IMAGE}": [
+        {
+          "type": "sigstoreSigned",
+          "keyPath": "/ctx/build/akmods-cosign.pub",
+          "signedIdentity": {"type": "matchRepository"}
+        }
+      ]
+    }
+  }
+}
+EOF
+cat >/tmp/akmods-policy/registries.d/ghcr.yaml <<'EOF'
+docker:
+  ghcr.io:
+    use-sigstore-attachments: true
+EOF
+skopeo --policy /tmp/akmods-policy/policy.json \
+	--registries.d /tmp/akmods-policy/registries.d \
+	copy --retry-times 3 \
+	"docker://${AKMODS_IMAGE}:${AKMODS_TAG}" dir:/tmp/akmods-rpms
 
 # The image carries its payload in a single layer. Unpack it, then move the RPMs
 # in with it so nvidia-install.sh finds them.
