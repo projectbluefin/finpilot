@@ -204,9 +204,24 @@ Branch=stable
 EOF
     run bash "${SCRIPT}" "${FIXTURES}"
     [ "${status}" -eq 0 ]
-    run grep -c '^remote-add --user --if-not-exists flathub ' "${CALLS}"
+    run grep -c '^remote-add --user --force flathub ' "${CALLS}"
     [ "${output}" = "1" ]
     run grep -c '^remote-info --user flathub org.gnome.Calculator//stable$' "${CALLS}"
+    [ "${output}" = "1" ]
+}
+
+@test "validator re-adds the pinned flathub remote with --force on every run" {
+    # Regression for projectbluefin/finpilot#523: --if-not-exists left a
+    # pre-existing dev-host flathub remote untouched, so validation resolved
+    # against a stale remote instead of the pinned descriptor. --force must be
+    # issued on every run so the pinned descriptor is always applied.
+    cat > "${FIXTURES}/base.preinstall" <<'EOF'
+[Flatpak Preinstall org.gnome.Calculator]
+Branch=stable
+EOF
+    run bash "${SCRIPT}" "${FIXTURES}"
+    [ "${status}" -eq 0 ]
+    run grep -c '^remote-add --user --force flathub ' "${CALLS}"
     [ "${output}" = "1" ]
 }
 

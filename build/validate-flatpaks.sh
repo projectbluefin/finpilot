@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Validate flatpak preinstall files under custom/flatpaks/ without mutating
-# the host beyond adding the flathub remote (--user, --if-not-exists).
+# the host beyond (re)installing the flathub remote (--user, --force).
 #
 # Contract enforced per app:
 #   - every line must be a blank line, a '#' comment, a [Flatpak Preinstall
@@ -16,6 +16,12 @@
 # Single implementation of the flatpak validation contract; the CI workflow
 # (.github/workflows/validate-flatpaks.yml) and `just validate-flatpaks` are
 # thin callers. Mirrors the Brewfile contract in build/validate-brewfiles.sh.
+#
+# --force (not --if-not-exists): on a dev host a flathub remote may already
+# exist, and --if-not-exists would leave it untouched, so validation runs
+# against a stale or misconfigured remote instead of the pinned descriptor.
+# --force re-adds the pinned descriptor every run so the check always resolves
+# against the intended flathub. See projectbluefin/finpilot#523.
 
 main() (
     set -euo pipefail
@@ -33,7 +39,7 @@ main() (
         exit 2
     fi
 
-    flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+    flatpak remote-add --user --force flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 
     workdir=$(mktemp -d)
     trap 'rm -rf -- "${workdir}"' EXIT
