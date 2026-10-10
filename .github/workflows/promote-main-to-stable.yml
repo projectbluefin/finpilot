@@ -109,16 +109,25 @@ jobs:
         run: |
           set -euo pipefail
 
-          git fetch origin "${PROMOTION_BRANCH}" main stable
+          git fetch origin main stable
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           # Repair the branch the reusable built. A missing branch means there
-          # was nothing to promote, so there is nothing to repair.
-          if ! git rev-parse --verify --quiet "origin/${PROMOTION_BRANCH}" >/dev/null; then
+          # was nothing to promote, so there is nothing to repair. Check before
+          # fetching it: fetching a ref the remote lacks exits 128 under -e.
+          # --exit-code returns 2 only for "no such ref"; any other failure
+          # (auth, network) must still fail the job.
+          status=0
+          git ls-remote --exit-code --heads origin "${PROMOTION_BRANCH}" >/dev/null || status=$?
+          if [ "${status}" -eq 2 ]; then
             echo "::notice::No ${PROMOTION_BRANCH} to repair."
             exit 0
+          elif [ "${status}" -ne 0 ]; then
+            echo "::error::git ls-remote failed (exit ${status}) checking ${PROMOTION_BRANCH}."
+            exit "${status}"
           fi
+          git fetch origin "${PROMOTION_BRANCH}"
 
           head_tree=$(git rev-parse "origin/${PROMOTION_BRANCH}^{tree}")
           main_tree=$(git rev-parse "origin/main^{tree}")

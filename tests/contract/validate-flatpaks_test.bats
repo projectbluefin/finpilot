@@ -3,9 +3,11 @@
 #
 # All runs use a fake flatpak binary, never the host's. The contract under
 # test: every line must be blank, a '#' comment, a [Flatpak Preinstall <app-id>]
-# header, or a key=value pair; every such section must declare Branch=; every
-# app-id is passed to `flatpak remote-info` as data; and an empty discovery
-# result fails closed instead of passing vacuously.
+# header, or a key=value pair; every such section must declare a non-empty
+# Branch= (an empty one fails closed); every app-id is passed to
+# `flatpak remote-info` as data, as <app-id>//<branch>, so an unresolvable
+# branch fails; and an empty discovery result fails closed instead of
+# passing vacuously.
 #
 # Run with: bats tests/contract/validate-flatpaks_test.bats
 
@@ -24,12 +26,23 @@ case "$1" in
     remote-add)
         ;;
     remote-info)
-        # $1=remote-info $2=--user $3=flathub $4=app-id
-        [[ $# -eq 4 ]] || exit 99
+        # $1=remote-info $2=--user $3=flathub $4=<app-id>//<branch>
+        [[ $# -eq 4 && "$4" == *//* ]] || exit 99
+        # Like flatpak's ref parser, reject a branch containing whitespace.
+        if [[ "${4#*//}" =~ [[:space:]] ]]; then
+            echo "error: Invalid branch ${4#*//}" >&2
+            exit 1
+        fi
         case " ${MOCK_REMOTE_FAILURES:-} " in
-            *" $4 "*)
+            *" ${4%%//*} "*)
                 echo 'error: remote-info failed' >&2
                 exit 42
+                ;;
+        esac
+        case " ${MOCK_BRANCH_FAILURES:-} " in
+            *" ${4#*//} "*)
+                echo 'error: No remote refs found for branch' >&2
+                exit 43
                 ;;
         esac
         ;;
@@ -69,6 +82,98 @@ EOF
     [[ "${output}" == *"PASS: ${FIXTURES}/base.preinstall: org.gnome.TextEditor (stable)"* ]]
 }
 
+@test "validator fails closed on an empty Branch= value" {
+    # Regression: an empty `Branch=` used to satisfy /^Branch=/ and pass,
+    # letting flatpak resolve against the remote default branch instead of
+    # failing closed. See projectbluefin/finpilot#504.
+    cat > "${FIXTURES}/base.preinstall" <<'EOF'
+[Flatpak Preinstall org.gnome.Calculator]
+Branch=
+EOF
+    run bash "${SCRIPT}" "${FIXTURES}"
+    [ "${status}" -eq 1 ]
+    [[ "${output}" == *"FAIL: ${FIXTURES}/base.preinstall: org.gnome.Calculator: missing Branch= key"* ]]
+}
+
+@test "validator fails closed on a whitespace-only Branch= value" {
+    # Whitespace-only is still empty for the END check, so it fails closed.
+    printf '[Flatpak Preinstall org.gnome.Calculator]\nBranch=   \n' > "${FIXTURES}/base.preinstall"
+    run bash "${SCRIPT}" "${FIXTURES}"
+    [ "${status}" -eq 1 ]
+    [[ "${output}" == *"FAIL: ${FIXTURES}/base.preinstall: org.gnome.Calculator: missing Branch= key"* ]]
+}
+
+@test "validator accepts key-side whitespace around the = (GKeyFile strips it)" {
+    # GKeyFile strips the whitespace around the key and the `=` before
+    # comparing, so `Branch = stable` is the key Branch and must not be
+    # reported as missing. See projectbluefin/finpilot#509.
+    cat > "${FIXTURES}/base.preinstall" <<'EOF'
+[Flatpak Preinstall org.gnome.Calculator]
+Branch = stable
+EOF
+    run bash "${SCRIPT}" "${FIXTURES}"
+    [ "${status}" -eq 0 ]
+    [[ "${output}" == *"PASS: ${FIXTURES}/base.preinstall: org.gnome.Calculator (stable)"* ]]
+}
+
+@test "validator preserves trailing whitespace in the Branch= value (GKeyFile does)" {
+    # GKeyFile strips only leading whitespace from the value, so
+    # `Branch=stable ` names the branch "stable " (with the trailing space),
+    # which flatpak cannot resolve. The branch is now checked on the remote,
+    # so this fails instead of resolving against the default branch and
+    # passing. See projectbluefin/finpilot#513.
+    printf '[Flatpak Preinstall org.gnome.Calculator]\nBranch=stable \n' > "${FIXTURES}/base.preinstall"
+    run bash "${SCRIPT}" "${FIXTURES}"
+    [ "${status}" -eq 1 ]
+    # bash's %q renders a trailing space as a backslash-escape, not quoted.
+    [[ "${output}" == *"FAIL: ${FIXTURES}/base.preinstall: org.gnome.Calculator: not on flathub at branch stable\\  (exit 1)"* ]]
+    run grep -c '^remote-info --user flathub org.gnome.Calculator//stable $' "${CALLS}"
+    [ "${output}" = "1" ]
+}
+
+@test "validator takes the last Branch= of a duplicate (GKeyFile last-wins)" {
+    # For a duplicate key GKeyFile uses the last value, not the first, so the
+    # later `Branch=stable` must win over the earlier `Branch=old`. See
+    # projectbluefin/finpilot#509.
+    cat > "${FIXTURES}/base.preinstall" <<'EOF'
+[Flatpak Preinstall org.gnome.Calculator]
+Branch=old
+Branch=stable
+EOF
+    run bash "${SCRIPT}" "${FIXTURES}"
+    [ "${status}" -eq 0 ]
+    [[ "${output}" == *"PASS: ${FIXTURES}/base.preinstall: org.gnome.Calculator (stable)"* ]]
+}
+
+@test "validator fails closed when the last of duplicate Branch= is empty" {
+    # GKeyFile last-wins also means an empty final value fails closed, even
+    # though an earlier value was non-empty. See projectbluefin/finpilot#509.
+    cat > "${FIXTURES}/base.preinstall" <<'EOF'
+[Flatpak Preinstall org.gnome.Calculator]
+Branch=stable
+Branch=
+EOF
+    run bash "${SCRIPT}" "${FIXTURES}"
+    [ "${status}" -eq 1 ]
+    [[ "${output}" == *"FAIL: ${FIXTURES}/base.preinstall: org.gnome.Calculator: missing Branch= key"* ]]
+}
+
+@test "validator fails when the Branch value does not exist on the remote" {
+    # Regression (projectbluefin/finpilot#513): Branch= was only echoed in
+    # the PASS line, so a non-empty but nonexistent branch (e.g. Branch=nope)
+    # passed because remote-info was called with the app-id alone and
+    # resolved against the remote default branch. remote-info is now called
+    # with <app-id>//<branch>, so a missing branch fails.
+    export MOCK_BRANCH_FAILURES="nope"
+    cat > "${FIXTURES}/base.preinstall" <<'EOF'
+[Flatpak Preinstall org.gnome.Calculator]
+Branch=nope
+EOF
+    run bash "${SCRIPT}" "${FIXTURES}"
+    [ "${status}" -eq 1 ]
+    [[ "${output}" == *"FAIL: ${FIXTURES}/base.preinstall: org.gnome.Calculator: not on flathub at branch nope (exit 43)"* ]]
+}
+
 @test "validator fails when an app is not on flathub" {
     export MOCK_REMOTE_FAILURES="com.example.Missing"
     cat > "${FIXTURES}/base.preinstall" <<'EOF'
@@ -77,7 +182,7 @@ Branch=stable
 EOF
     run bash "${SCRIPT}" "${FIXTURES}"
     [ "${status}" -eq 1 ]
-    [[ "${output}" == *"FAIL: ${FIXTURES}/base.preinstall: com.example.Missing: not on flathub (exit 42)"* ]]
+    [[ "${output}" == *"FAIL: ${FIXTURES}/base.preinstall: com.example.Missing: not on flathub at branch stable (exit 42)"* ]]
 }
 
 @test "validator fails closed when the directory has no preinstall files" {
@@ -92,7 +197,7 @@ EOF
     [[ "${output}" == *"Flatpak directory does not exist"* ]]
 }
 
-@test "validator ensures the flathub remote and passes app-ids as data" {
+@test "validator ensures the flathub remote and passes the branch as data" {
     cat > "${FIXTURES}/base.preinstall" <<'EOF'
 [Flatpak Preinstall org.gnome.Calculator]
 Branch=stable
@@ -101,7 +206,7 @@ EOF
     [ "${status}" -eq 0 ]
     run grep -c '^remote-add --user --if-not-exists flathub ' "${CALLS}"
     [ "${output}" = "1" ]
-    run grep -c '^remote-info --user flathub org.gnome.Calculator$' "${CALLS}"
+    run grep -c '^remote-info --user flathub org.gnome.Calculator//stable$' "${CALLS}"
     [ "${output}" = "1" ]
 }
 
