@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Validate flatpak preinstall files under custom/flatpaks/ without mutating
-# the host beyond adding the flathub remote (--user, --if-not-exists).
+# the host user flatpak installation (runs inside an isolated FLATPAK_USER_DIR).
 #
 # Contract enforced per app:
 #   - every line must be a blank line, a '#' comment, a [Flatpak Preinstall
@@ -33,10 +33,14 @@ main() (
         exit 2
     fi
 
-    flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-
     workdir=$(mktemp -d)
     trap 'rm -rf -- "${workdir}"' EXIT
+
+    # Isolate user-level flatpak state so host remotes are neither inspected
+    # nor mutated, and the pinned flathub descriptor is always added fresh.
+    export FLATPAK_USER_DIR="${workdir}/flatpak"
+    flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+
     # Materialize discovery so find/sort failures cannot become an empty success.
     find "${root}" -type f -iname '*.preinstall' -print0 | sort -z > "${workdir}/files"
     mapfile -d '' -t preinstalls < "${workdir}/files"

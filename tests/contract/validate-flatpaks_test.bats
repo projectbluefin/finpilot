@@ -14,14 +14,18 @@
 SCRIPT="${BATS_TEST_DIRNAME}/../../build/validate-flatpaks.sh"
 
 setup() {
+    unset FLATPAK_USER_DIR
     WORKDIR="$(mktemp -d)"
     FIXTURES="${WORKDIR}/flatpaks"
     CALLS="${WORKDIR}/calls"
     mkdir -p "${FIXTURES}" "${WORKDIR}/bin"
     : > "${CALLS}"
+    MOCK_ENV_CALLS="${WORKDIR}/env_calls"
+    : > "${MOCK_ENV_CALLS}"
     cat > "${WORKDIR}/bin/flatpak" <<'MOCK'
 #!/usr/bin/bash
 printf '%s\n' "$*" >> "${CALLS}"
+printf 'FLATPAK_USER_DIR=%s\n' "${FLATPAK_USER_DIR:-}" >> "${MOCK_ENV_CALLS}"
 case "$1" in
     remote-add)
         ;;
@@ -51,6 +55,7 @@ esac
 MOCK
     chmod +x "${WORKDIR}/bin/flatpak"
     export CALLS
+    export MOCK_ENV_CALLS
     export PATH="${WORKDIR}/bin:/usr/bin:/bin"
 }
 
@@ -197,7 +202,7 @@ EOF
     [[ "${output}" == *"Flatpak directory does not exist"* ]]
 }
 
-@test "validator ensures the flathub remote and passes the branch as data" {
+@test "validator ensures the flathub remote in an isolated FLATPAK_USER_DIR and passes branch as data" {
     cat > "${FIXTURES}/base.preinstall" <<'EOF'
 [Flatpak Preinstall org.gnome.Calculator]
 Branch=stable
@@ -208,6 +213,26 @@ EOF
     [ "${output}" = "1" ]
     run grep -c '^remote-info --user flathub org.gnome.Calculator//stable$' "${CALLS}"
     [ "${output}" = "1" ]
+    # Ensure FLATPAK_USER_DIR was exported to a subdirectory of the validator's workdir
+    run grep '^FLATPAK_USER_DIR=.*/flatpak$' "${MOCK_ENV_CALLS}"
+    [ "${status}" -eq 0 ]
+    [ "${#lines[@]}" -ge 2 ]
+    # Ensure the isolated directory is distinct from the test's own workdir
+    run grep "^FLATPAK_USER_DIR=${WORKDIR}" "${MOCK_ENV_CALLS}"
+    [ "${status}" -ne 0 ]
+}
+
+@test "validator overrides pre-existing FLATPAK_USER_DIR with temporary isolation dir" {
+    cat > "${FIXTURES}/base.preinstall" <<'EOF'
+[Flatpak Preinstall org.gnome.Calculator]
+Branch=stable
+EOF
+    FLATPAK_USER_DIR="/host/user/flatpak" run bash "${SCRIPT}" "${FIXTURES}"
+    [ "${status}" -eq 0 ]
+    run grep '^FLATPAK_USER_DIR=/host/user/flatpak$' "${MOCK_ENV_CALLS}"
+    [ "${status}" -ne 0 ]
+    run grep '^FLATPAK_USER_DIR=.*/flatpak$' "${MOCK_ENV_CALLS}"
+    [ "${status}" -eq 0 ]
 }
 
 @test "validator accepts blank lines and # comments" {
