@@ -19,10 +19,15 @@ set -euo pipefail
 #   2. Copy the RUN block for 40-gnome-extensions.sh from build/README.md into
 #      the Containerfile, after the 20-packages-and-services.sh block.
 #   3. Add the extensions you want to the lists in sections 1 and 2.
+#
+# Every download is pinned to an immutable reference (an extensions.gnome.org
+# version_tag, a GitHub commit) and checked against a sha256 before anything is
+# unpacked. Extensions run as JavaScript inside gnome-shell with every user's
+# session privileges, and the finished image is signed, so a floating branch or
+# "latest release" would let an upstream change ship in the image unseen. The
+# comments on each list say how to refresh its pins.
 ###############################################################################
 
-# The shell major version is what extensions.gnome.org knows about (50.4 -> 50).
-SHELL_MAJOR="$(gnome-shell --version | awk '{print $3}' | cut -d. -f1)"
 EXTENSIONS_DIR=/usr/share/gnome-shell/extensions
 OVERRIDE_FILE=/usr/share/glib-2.0/schemas/zz1-custom-extensions.gschema.override
 
@@ -30,24 +35,46 @@ OVERRIDE_FILE=/usr/share/glib-2.0/schemas/zz1-custom-extensions.gschema.override
 # never has to be kept in sync by hand.
 INSTALLED_EXTENSIONS=()
 
+# verify_sha256 <file> <expected>: fails the build when the download does not
+# match its pin, so a changed upstream artifact is caught rather than installed.
+verify_sha256() {
+	local file="$1" expected="$2" actual
+	actual="$(sha256sum "${file}" | awk '{print $1}')"
+	if [[ "${actual}" != "${expected}" ]]; then
+		echo "ERROR: sha256 mismatch for ${file}" >&2
+		echo "  expected: ${expected}" >&2
+		echo "  actual:   ${actual}" >&2
+		return 1
+	fi
+}
+
 ###############################################################################
 # 1. From extensions.gnome.org
 ###############################################################################
-# One line per extension, by uuid. Any uuid from https://extensions.gnome.org
-# works; the site does not check packages against your shell version, so pick
-# ones whose pages list this GNOME release.
+# One line per extension: uuid, version_tag, sha256 of the zip. The version_tag
+# names one uploaded release, so the same file is fetched on every build. To
+# find the current tag for a shell release (50.4 -> 50):
+#
+#   curl -fsSL 'https://extensions.gnome.org/extension-info/?uuid=<uuid>&shell_version=50' | jq .version_tag
+#   curl -fsSL 'https://extensions.gnome.org/download-extension/<uuid>.shell-extension.zip?version_tag=<tag>' | sha256sum
+#
+# The site does not check packages against your shell version, so pick tags
+# whose extension pages list this GNOME release.
 
 EGO_EXTENSIONS=(
-	caffeine@patapon.info
-	blur-my-shell@aunetx
+	"caffeine@patapon.info 76057 3ec59c6d1a62c26ba5c45128b084b62ef4e112fa66008768b5094df940e6a164"
+	"blur-my-shell@aunetx 75939 9ad74044e7ece1e9a2025ddab107240fcc9b5e33ed2b2b651ea97ae7b8a29df4"
 )
 
-for uuid in "${EGO_EXTENSIONS[@]}"; do
-	info_url="https://extensions.gnome.org/extension-info/?uuid=${uuid}&shell_version=${SHELL_MAJOR}"
-	download_path="$(curl -fsSL "${info_url}" | jq -r .download_url)"
+for entry in "${EGO_EXTENSIONS[@]}"; do
+	read -r uuid version_tag sha256 <<<"${entry}"
+
+	curl -fsSL \
+		"https://extensions.gnome.org/download-extension/${uuid}.shell-extension.zip?version_tag=${version_tag}" \
+		-o /tmp/extension.zip
+	verify_sha256 /tmp/extension.zip "${sha256}"
 
 	mkdir -p "${EXTENSIONS_DIR}/${uuid}"
-	curl -fsSL "https://extensions.gnome.org${download_path}" -o /tmp/extension.zip
 	unzip -q -o /tmp/extension.zip -d "${EXTENSIONS_DIR}/${uuid}"
 	rm -f /tmp/extension.zip
 
@@ -59,9 +86,15 @@ done
 ###############################################################################
 # One line per extension, for projects that publish sources instead of a release
 # archive, such as bluefin-bling. Each line is the repository and the path to
-# one extension inside it. All entries come from the same branch.
+# one extension inside it. All entries come from the same commit, pinned below
+# by its full sha together with the sha256 of that commit's tarball. To move
+# the pin:
+#
+#   gh api repos/projectbluefin/bluefin-bling/commits/main --jq .sha
+#   curl -fsSL "https://codeload.github.com/projectbluefin/bluefin-bling/tar.gz/<sha>" | sha256sum
 
-GITHUB_BRANCH="main"
+GITHUB_COMMIT="69e10ef9f988513c20a5a3e185a3b879d3c79ed5"
+GITHUB_TARBALL_SHA256="f893d2b16e7a3f61ae343b6baab01d7f73489c2b260a0a015abc29d1c44bf073"
 
 GITHUB_EXTENSIONS=(
 	"projectbluefin/bluefin-bling extensions/power-status-color"
@@ -72,12 +105,14 @@ for entry in "${GITHUB_EXTENSIONS[@]}"; do
 	read -r repository path <<<"${entry}"
 
 	work_dir="$(mktemp -d)"
-	curl -fsSL "https://codeload.github.com/${repository}/tar.gz/refs/heads/${GITHUB_BRANCH}" |
-		tar -xz -C "${work_dir}"
+	curl -fsSL "https://codeload.github.com/${repository}/tar.gz/${GITHUB_COMMIT}" \
+		-o "${work_dir}/source.tar.gz"
+	verify_sha256 "${work_dir}/source.tar.gz" "${GITHUB_TARBALL_SHA256}"
+	tar -xzf "${work_dir}/source.tar.gz" -C "${work_dir}"
 
-	# The archive root is <repository>-<branch>. Reading the uuid from the
+	# The archive root is <repository>-<commit>. Reading the uuid from the
 	# extension keeps the install directory in step with its metadata.json.
-	source_dir="${work_dir}/${repository#*/}-${GITHUB_BRANCH}/${path}"
+	source_dir="${work_dir}/${repository#*/}-${GITHUB_COMMIT}/${path}"
 	uuid="$(jq -r .uuid "${source_dir}/metadata.json")"
 	mkdir -p "${EXTENSIONS_DIR}/${uuid}"
 	cp -a "${source_dir}/." "${EXTENSIONS_DIR}/${uuid}/"
