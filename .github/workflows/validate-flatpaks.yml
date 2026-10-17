@@ -8,6 +8,7 @@ on:
       - "custom/flatpaks/**"
       - "build/validate-flatpaks.sh"
       - "tests/contract/validate-flatpaks_test.bats"
+      - "tests/fixtures/flathub.flatpakrepo"
       - ".github/workflows/validate-flatpaks.yml"
 jobs:
   validate:

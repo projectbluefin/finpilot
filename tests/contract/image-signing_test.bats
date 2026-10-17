@@ -62,7 +62,10 @@ grep_code() {
 }
 
 @test "image-signing: no build phase merges a policy scope" {
-    run grep_code 'policy\.json|registries\.d'
+    # Only the policy the image ships matters here. A build phase may hand
+    # skopeo a throwaway --policy under /tmp to verify something it pulls
+    # during the build; that file never reaches the device.
+    run grep_code '/etc/containers/(policy\.json|registries\.d)'
     [ "$status" -ne 0 ]
 }
 
