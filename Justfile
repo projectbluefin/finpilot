@@ -216,12 +216,6 @@ build $target_image=IMAGE_NAME $tag=DEFAULT_TAG:
         fi
     done
 
-    # Add GitHub token as build secret if available (for CI/CD)
-    if [[ -n "${GITHUB_TOKEN:-}" ]]; then
-        echo "Adding GitHub token as build secret"
-        BUILD_ARGS+=("--secret" "id=GITHUB_TOKEN,env=GITHUB_TOKEN")
-    fi
-
     # Registry layer cache - speeds up rebuilds by reusing unchanged layers from GHCR
     # CI sets REGISTRY_CACHE_WRITE=1 for candidate builds; local builds stay
     # read-only so a developer never poisons the shared cache

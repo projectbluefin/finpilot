@@ -258,18 +258,12 @@ podman_build_args() {
     [[ "${args}" == *"--tag localhost/finpilot:stable"* ]]
 }
 
-@test "build: forwards GITHUB_TOKEN as a build secret when set" {
+@test "build: passes no build secret, even with GITHUB_TOKEN exported" {
+    # No Containerfile RUN mounts a secret, so forwarding one would hand a
+    # credential to the build with nothing to read it. A fork that needs a
+    # token at build time adds the --mount=type=secret and the --secret flag
+    # together.
     GITHUB_TOKEN="s3cret" run_just build finpilot stable
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"Adding GitHub token as build secret"* ]]
-    [[ "$(podman_build_args)" == *"--secret id=GITHUB_TOKEN,env=GITHUB_TOKEN"* ]]
-}
-
-@test "build: does not add a build secret when GITHUB_TOKEN is unset" {
-    # Do not inherit an exported token from the developer's shell or a workflow
-    # that passes one in; the assertion is specifically about the unset case.
-    unset GITHUB_TOKEN
-    run_just build finpilot stable
     [ "$status" -eq 0 ]
     [[ "$(podman_build_args)" != *"--secret"* ]]
 }
