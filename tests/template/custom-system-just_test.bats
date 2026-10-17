@@ -127,6 +127,15 @@ _run_recipe() {
     [[ "${output}" == *"tester is already in: docker libvirt"* ]]
 }
 
+@test "configure-dev-groups does not mistake a similarly named group for membership" {
+    # docker-users and libvirt-dev contain the target names as words; only an
+    # exact group name counts as membership.
+    _run_recipe "configure-dev-groups" MOCK_GETENT_STATUS=0 MOCK_GROUPS="tester docker-users libvirt-dev"
+
+    [ "${status}" -eq 0 ]
+    grep -qF "sudo usermod --append --groups docker,libvirt tester" "${COMMAND_LOG}"
+}
+
 @test "configure-dev-groups cancels without changing anything" {
     _run_recipe "configure-dev-groups" MOCK_GETENT_STATUS=0 MOCK_GROUPS="tester" MOCK_CONFIRM=1
 
@@ -171,6 +180,26 @@ _run_recipe() {
     backup="$(ls "${HOME}/.config/app/"config.conf.backup.* 2>/dev/null | head -n1)"
     [ -n "${backup}" ]
     [ "$(cat "${backup}")" = "mine" ]
+}
+
+@test "install-config reports the backup name it actually wrote" {
+    # A backup already holding the timestamped name forces a numbered suffix;
+    # the summary must name that file, not the one it stepped around.
+    mkdir -p "${WORKDIR}/skel/app" "${HOME}/.config/app" "${MOCKDIR}"
+    printf 'default\n' > "${WORKDIR}/skel/app/config.conf"
+    printf 'mine\n' > "${HOME}/.config/app/config.conf"
+    printf 'older\n' > "${HOME}/.config/app/config.conf.backup.2026-01-01_00-00-00"
+    _write_mock "date" <<'MOCK'
+#!/usr/bin/bash
+echo "2026-01-01_00-00-00"
+MOCK
+
+    _run_recipe "install-config" SKEL_CONFIG="${WORKDIR}/skel"
+
+    [ "${status}" -eq 0 ]
+    [ "$(cat "${HOME}/.config/app/config.conf.backup.2026-01-01_00-00-00")" = "older" ]
+    [ "$(cat "${HOME}/.config/app/config.conf.backup.2026-01-01_00-00-00.1")" = "mine" ]
+    [[ "${output}" == *"- app/config.conf.backup.2026-01-01_00-00-00.1"* ]]
 }
 
 @test "install-config lists the conflicts it is about to back up" {
