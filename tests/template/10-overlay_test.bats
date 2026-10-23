@@ -49,10 +49,14 @@ setup() {
 		-e "s#/etc/flatpak#${SANDBOX}/etc/flatpak#g" \
 		"${OVERLAY_SRC}" >"${SCRIPT}"
 
-	export PATH="${STUB_BIN}:${PATH}"
-	export RSYNC_LOG SYSTEMCTL_LOG CURL_LOG
+	# What the curl stub serves: the committed copy of the descriptor by
+	# default, so the pin in the script is checked against real bytes.
+	CURL_BODY="${REPO_ROOT}/tests/fixtures/flathub.flatpakrepo"
 
-	for tool in rsync systemctl curl; do
+	export PATH="${STUB_BIN}:${PATH}"
+	export RSYNC_LOG SYSTEMCTL_LOG CURL_LOG CURL_BODY
+
+	for tool in rsync systemctl; do
 		local log_var
 		log_var="$(printf '%s' "${tool}" | tr '[:lower:]' '[:upper:]')_LOG"
 		cat >"${STUB_BIN}/${tool}" <<EOF
@@ -62,6 +66,21 @@ exit 0
 EOF
 		chmod +x "${STUB_BIN}/${tool}"
 	done
+
+	# curl also honours --output so the script has a file to verify.
+	cat >"${STUB_BIN}/curl" <<'EOF'
+#!/usr/bin/bash
+printf '%s\n' "$*" >> "${CURL_LOG}"
+while [ $# -gt 0 ]; do
+	if [ "$1" = "--output" ]; then
+		cp "${CURL_BODY}" "$2"
+		shift
+	fi
+	shift
+done
+exit 0
+EOF
+	chmod +x "${STUB_BIN}/curl"
 }
 
 teardown() {
@@ -245,17 +264,51 @@ teardown() {
 	[ "${calls[8]}" = "enable podman.socket" ]
 }
 
-@test "10-overlay: ships the Flathub remote descriptor" {
+@test "10-overlay: ships the Flathub remote descriptor once its hash matches the pin" {
 	run bash "${SCRIPT}"
 	[ "$status" -eq 0 ]
 
 	# flatpak imports remotes from this directory the first time it is used, so
 	# the descriptor replaces both a unit and a build-time remote-add. It is
-	# fetched rather than committed so Flathub's signing key stays current.
+	# fetched to a scratch path, checked against the committed sha256, and only
+	# then installed: the file names the Url= and GPGKey= every Flatpak on the
+	# image is verified against, so it is pinned like every other build input.
 	mapfile -t calls <"${CURL_LOG}"
 	[ "${#calls[@]}" -eq 1 ]
-	[[ "${calls[0]}" == *"--output ${SANDBOX}/etc/flatpak/remotes.d/flathub.flatpakrepo"* ]]
 	[[ "${calls[0]}" == *"https://dl.flathub.org/repo/flathub.flatpakrepo"* ]]
+	[[ "${calls[0]}" != *"--output ${SANDBOX}/etc/flatpak/remotes.d/"* ]]
+
+	local installed="${SANDBOX}/etc/flatpak/remotes.d/flathub.flatpakrepo"
+	[ -f "${installed}" ]
+	cmp -s "${installed}" "${CURL_BODY}"
+	[ "$(stat -c '%a' "${installed}")" = "644" ]
+}
+
+@test "10-overlay: pinned descriptor hash matches the committed fixture" {
+	# Guards the constant itself: if the fixture is refreshed without bumping
+	# the pin (or vice versa) the build would fail closed, which this catches
+	# before CI does.
+	local pinned
+	pinned="$(sed -nE 's/^FLATHUB_REPO_SHA256=([0-9a-f]{64})$/\1/p' "${OVERLAY_SRC}")"
+	[ -n "${pinned}" ]
+	[ "${pinned}" = "$(sha256sum "${CURL_BODY}" | cut -d' ' -f1)" ]
+}
+
+@test "10-overlay: a descriptor that does not match the pin fails the build and installs nothing" {
+	local tampered="${TEST_ROOT}/tampered.flatpakrepo"
+	sed -e 's#^Url=.*#Url=https://evil.example/repo/#' \
+		-e 's#^GPGKey=.*#GPGKey=QUFBQQ==#' \
+		"${CURL_BODY}" >"${tampered}"
+	export CURL_BODY="${tampered}"
+
+	run bash "${SCRIPT}"
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"FAILED"* ]]
+	[ ! -e "${SANDBOX}/etc/flatpak/remotes.d/flathub.flatpakrepo" ]
+
+	# Failure happens before the services are enabled, so a half-built image
+	# cannot slip past with the remote missing.
+	[ ! -s "${SYSTEMCTL_LOG}" ]
 }
 
 @test "10-overlay: an empty brew dir fails the build despite nullglob (regression guard)" {

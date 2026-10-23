@@ -2,7 +2,7 @@ export IMAGE_NAME := env("IMAGE_NAME", "finpilot")
 export DEFAULT_TAG := env("DEFAULT_TAG", "stable")
 export PODMAN := env("PODMAN", "podman")
 export REPO_ORG := env("GITHUB_REPOSITORY_OWNER", "projectbluefin")
-export bib_image := env("BIB_IMAGE", "ghcr.io/osbuild/bootc-image-builder:latest@sha256:b16cb7f2bed646f24a8c1448994c9746ebdc53a2ea0e29cc976623a0bb7b598b")
+export bib_image := env("BIB_IMAGE", "ghcr.io/osbuild/bootc-image-builder:latest@sha256:0d105b04d018f4ee8daf241821d12c90096013f6afd723ec46afa22ebd0f0ca0")
 export qemu_image := env("QEMU_IMAGE", "ghcr.io/qemus/qemu:7.50@sha256:e7f6fda52503a546fd649670ba46e4bc23dc6dcef275bc3fac48877fbbc430df")
 export vm_ram := env("VM_RAM", "8192")
 export vm_cpus := env("VM_CPUS", "4")
@@ -215,12 +215,6 @@ build $target_image=IMAGE_NAME $tag=DEFAULT_TAG:
             BUILD_ARGS+=("--build-arg" "${metadata_arg}=${!metadata_arg}")
         fi
     done
-
-    # Add GitHub token as build secret if available (for CI/CD)
-    if [[ -n "${GITHUB_TOKEN:-}" ]]; then
-        echo "Adding GitHub token as build secret"
-        BUILD_ARGS+=("--secret" "id=GITHUB_TOKEN,env=GITHUB_TOKEN")
-    fi
 
     # Registry layer cache - speeds up rebuilds by reusing unchanged layers from GHCR
     # CI sets REGISTRY_CACHE_WRITE=1 for candidate builds; local builds stay

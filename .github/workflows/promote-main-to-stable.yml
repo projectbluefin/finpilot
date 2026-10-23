@@ -36,7 +36,7 @@ concurrency:
 jobs:
   promote:
     name: Promote main to stable
-    uses: projectbluefin/actions/.github/workflows/reusable-promote-squash.yml@f55c40caae7abf265b1f914dae21c519d1f18716 # v1
+    uses: projectbluefin/actions/.github/workflows/reusable-promote-squash.yml@b541b99e9d798cd818987004405f205891e65de1 # v1
     with:
       variants: >-
         [{"image":"${{ github.event.repository.name }}"}]
@@ -109,16 +109,25 @@ jobs:
         run: |
           set -euo pipefail
 
-          git fetch origin "${PROMOTION_BRANCH}" main stable
+          git fetch origin main stable
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           # Repair the branch the reusable built. A missing branch means there
-          # was nothing to promote, so there is nothing to repair.
-          if ! git rev-parse --verify --quiet "origin/${PROMOTION_BRANCH}" >/dev/null; then
+          # was nothing to promote, so there is nothing to repair. Check before
+          # fetching it: fetching a ref the remote lacks exits 128 under -e.
+          # --exit-code returns 2 only for "no such ref"; any other failure
+          # (auth, network) must still fail the job.
+          status=0
+          git ls-remote --exit-code --heads origin "${PROMOTION_BRANCH}" >/dev/null || status=$?
+          if [ "${status}" -eq 2 ]; then
             echo "::notice::No ${PROMOTION_BRANCH} to repair."
             exit 0
+          elif [ "${status}" -ne 0 ]; then
+            echo "::error::git ls-remote failed (exit ${status}) checking ${PROMOTION_BRANCH}."
+            exit "${status}"
           fi
+          git fetch origin "${PROMOTION_BRANCH}"
 
           head_tree=$(git rev-parse "origin/${PROMOTION_BRANCH}^{tree}")
           main_tree=$(git rev-parse "origin/main^{tree}")
@@ -241,7 +250,7 @@ jobs:
       issues: write
       packages: read
       pull-requests: write
-    uses: projectbluefin/actions/.github/workflows/reusable-release-gate.yml@f55c40caae7abf265b1f914dae21c519d1f18716 # v1
+    uses: projectbluefin/actions/.github/workflows/reusable-release-gate.yml@b541b99e9d798cd818987004405f205891e65de1 # v1
     with:
       repo: ${{ github.repository }}
       pr_number: ${{ needs.locate-promotion-pr.outputs.pr_number }}

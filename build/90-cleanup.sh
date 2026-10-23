@@ -17,8 +17,10 @@ REPOS_DIR="${CLEAN_ROOT}/etc/yum.repos.d"
 
 echo "::group:: Finalise package repositories"
 
-# Revert the build-time dnf settings the Containerfile installs.
-dnf5 config-manager setopt keepcache=0
+# Revert the build-time dnf settings the Containerfile installs. Removing the
+# keys, rather than overwriting one, leaves the base image's dnf.conf as it was,
+# so packages installed on top of the image still pull in weak dependencies.
+dnf5 config-manager unsetopt keepcache install_weak_deps
 dnf5 versionlock clear
 
 # Disable every third-party repository. copr_install_isolated already disables

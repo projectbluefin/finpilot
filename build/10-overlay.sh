@@ -112,12 +112,24 @@ echo "::group:: Add the Flathub remote descriptor"
 # applied-remotes list: the remote is imported once, and is the user's to remove
 # afterwards. Shipping the descriptor is therefore all that is needed. There is
 # deliberately no unit and no build-time `flatpak remote-add`, which would only
-# write to /var and be pruned by 90-cleanup.sh. Fetched rather than committed so
-# Flathub's signing key stays current.
+# write to /var and be pruned by 90-cleanup.sh.
+#
+# The descriptor is pinned like every other input to this image: it carries
+# Url= and GPGKey=, so it is the trust root every Flatpak on the image is
+# verified against, not merely a pointer to one. OSTree's signature check is
+# only as good as the key this file names. Flathub's key has not changed since
+# the repository opened, so a hash bump here means Flathub itself moved and the
+# new descriptor deserves a look before it ships. tests/fixtures holds the
+# pinned copy.
+FLATHUB_REPO_SHA256=3371dd250e61d9e1633630073fefda153cd4426f72f4afa0c3373ae2e8fea03a
 install -d -m0755 /etc/flatpak/remotes.d
+flathub_tmp="$(mktemp)"
 curl --fail --retry 3 --silent --show-error \
-	--output /etc/flatpak/remotes.d/flathub.flatpakrepo \
+	--output "${flathub_tmp}" \
 	https://dl.flathub.org/repo/flathub.flatpakrepo
+echo "${FLATHUB_REPO_SHA256}  ${flathub_tmp}" | sha256sum --check --strict
+install -m0644 "${flathub_tmp}" /etc/flatpak/remotes.d/flathub.flatpakrepo
+rm -f "${flathub_tmp}"
 
 echo "::endgroup::"
 

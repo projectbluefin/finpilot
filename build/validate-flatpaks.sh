@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
 # Validate flatpak preinstall files under custom/flatpaks/ without mutating
-# the host beyond adding the flathub remote (--user, --if-not-exists).
+# the host user flatpak installation (runs inside an isolated FLATPAK_USER_DIR).
 #
 # Contract enforced per app:
 #   - every line must be a blank line, a '#' comment, a [Flatpak Preinstall
 #     <app-id>] header, or a key=value pair, which is the shape GKeyFile
 #     accepts; flatpak logs anything else at g_info level and then discards the
 #     whole file, so malformed syntax looks identical to an empty list
-#   - every [Flatpak Preinstall <app-id>] section must declare a Branch= key
-#   - every declared app-id must resolve on the flathub remote
+#   - every [Flatpak Preinstall <app-id>] section must declare a non-empty
+#     Branch= key (an empty one fails closed, never resolves on the remote)
+#   - every declared app-id must resolve on the flathub remote at its declared
+#     branch (queried as <app-id>//<branch>, so a malformed or unpublished
+#     branch fails instead of passing on the app-id alone)
 #
 # Single implementation of the flatpak validation contract; the CI workflow
 # (.github/workflows/validate-flatpaks.yml) and `just validate-flatpaks` are
@@ -30,10 +33,20 @@ main() (
         exit 2
     fi
 
-    flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    remote_cfg="${script_dir}/../tests/fixtures/flathub.flatpakrepo"
+    if [[ ! -f "${remote_cfg}" ]]; then
+        printf 'FAIL: Flathub remote descriptor not found: %s\n' "${remote_cfg}" >&2
+        exit 1
+    fi
 
     workdir=$(mktemp -d)
     trap 'rm -rf -- "${workdir}"' EXIT
+
+    # Isolate user-level flatpak state so host remotes are neither inspected
+    # nor mutated, and the pinned flathub descriptor is always added fresh.
+    export FLATPAK_USER_DIR="${workdir}/flatpak"
+    flatpak remote-add --user --if-not-exists flathub "${remote_cfg}"
     # Materialize discovery so find/sort failures cannot become an empty success.
     find "${root}" -type f -iname '*.preinstall' -print0 | sort -z > "${workdir}/files"
     mapfile -d '' -t preinstalls < "${workdir}/files"
@@ -73,9 +86,23 @@ main() (
         while IFS= read -r app_id; do
             branch=$(awk -v app="${app_id}" '
                 $0 == "[Flatpak Preinstall " app "]" {found=1; next}
-                found && /^Branch=/ {print; valid=1; exit}
+                # GKeyFile strips the whitespace around the key and the "="
+                # before comparing, so `Branch = stable` is the key Branch,
+                # and for a duplicate key the LAST value wins (g_hash_table_replace
+                # in glib/gkeyfile.c). Strip only leading whitespace from the
+                # value: GKeyFile preserves trailing whitespace (g_strndup to
+                # end of line), so `Branch=stable ` names branch "stable "
+                # and the remote check must catch that. Fail closed when the
+                # last value is empty. See projectbluefin/finpilot#509 #513.
+                found && /^[[:space:]]*Branch[[:space:]]*=/ {
+                    val = $0
+                    sub(/^[^=]*=/, "", val)
+                    sub(/^[[:space:]]+/, "", val)
+                    branch = val
+                    valid = 1
+                }
                 found && /^\[/ {exit}
-                END {if (!valid) print "MISSING"}
+                END {if (!valid || branch == "") print "MISSING"; else print branch}
             ' "${preinstall}")
             if [[ "${branch}" == "MISSING" ]]; then
                 failed=$((failed + 1))
@@ -83,13 +110,18 @@ main() (
                 continue
             fi
             checked=$((checked + 1))
-            if flatpak remote-info --user flathub "${app_id}" > "${workdir}/output" 2>&1; then
-                printf 'PASS: %s: %s (%s)\n' "${preinstall}" "${app_id}" "${branch#Branch=}"
+            # Pass the Branch= value in the app ref (APP//BRANCH) so a
+            # non-empty but nonexistent or malformed branch (e.g. Branch=nope,
+            # Branch=stable with trailing space) fails here instead of
+            # resolving against the remote's default branch and passing.
+            ref="${app_id}//${branch}"
+            if flatpak remote-info --user flathub "${ref}" > "${workdir}/output" 2>&1; then
+                printf 'PASS: %s: %s (%s)\n' "${preinstall}" "${app_id}" "${branch}"
             else
                 rc=$?
                 failed=$((failed + 1))
-                printf 'FAIL: %s: %s: not on flathub (exit %s)\n' "${preinstall}" "${app_id}" "${rc}" >&2
-                printf 'Command: flatpak remote-info --user flathub %q\n' "${app_id}" >&2
+                printf 'FAIL: %s: %s: not on flathub at branch %q (exit %s)\n' "${preinstall}" "${app_id}" "${branch}" "${rc}" >&2
+                printf 'Command: flatpak remote-info --user flathub %q\n' "${ref}" >&2
                 sed 's/^/  /' "${workdir}/output" >&2
             fi
         done < <(sed -n 's/^\[Flatpak Preinstall \(.*\)\]$/\1/p' "${preinstall}")

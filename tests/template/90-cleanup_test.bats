@@ -97,7 +97,7 @@ run_cleanup() {
 
 	mapfile -t calls <"${DNF5_LOG}"
 	[ "${#calls[@]}" -eq 2 ]
-	[ "${calls[0]}" = "config-manager setopt keepcache=0" ]
+	[ "${calls[0]}" = "config-manager unsetopt keepcache install_weak_deps" ]
 	[ "${calls[1]}" = "versionlock clear" ]
 }
 
