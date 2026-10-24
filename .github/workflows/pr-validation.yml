@@ -61,7 +61,7 @@ jobs:
           echo "Resolved shellcheck scope: ${glob}"
 
       - name: Validate
-        uses: projectbluefin/actions/bootc-build/validate-pr@b541b99e9d798cd818987004405f205891e65de1 # v1
+        uses: projectbluefin/actions/bootc-build/validate-pr@d18642a8b4b325c2551eabd9a65c1ad12b4ebb30 # v1
         with:
           shellcheck-glob: ${{ steps.shell-scope.outputs.glob }}
           dockerfile: "Containerfile"
