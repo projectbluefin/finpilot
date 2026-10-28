@@ -309,15 +309,18 @@ _build-bib $target_image $tag $type $config: (_rootful_load_image target_image t
 
     # Bootc Image Builder records the post-install `bootc switch` origin from
     # the image reference it is given, so an ISO has to be built against the
-    # published reference instead of the local build tag. The image names
-    # itself in image-info.json, which keeps one source of truth for forks and
-    # means iso/iso.toml carries no image reference at all.
+    # published reference instead of the local build tag. The image names its
+    # repository in image-info.json, which keeps one source of truth for forks
+    # and means iso/iso.toml carries no image reference at all. The caller's tag
+    # names the channel: the baked image-tag is the compose-time tag, and
+    # `:stable` is a digest copy of the `:stable-testing` build, so trusting it
+    # would put every machine installed from a stable ISO on the test channel.
     build_image="${target_image}:${tag}"
     if [[ "${type}" == "iso" ]]; then
         image_info=$(just sudoif podman run --rm --entrypoint /usr/bin/cat \
             "${target_image}:${tag}" /usr/share/ublue-os/image-info.json)
         image_ref=$(jq -r '."image-ref"' <<<"${image_info}" | sed 's|.*docker://||')
-        build_image="${image_ref}:$(jq -r '."image-tag"' <<<"${image_info}")"
+        build_image="${image_ref}:${tag}"
         just sudoif podman tag "${target_image}:${tag}" "${build_image}"
     fi
 

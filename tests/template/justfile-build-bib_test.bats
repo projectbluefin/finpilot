@@ -8,8 +8,9 @@
 # until an ISO is in a user's hands: an ISO built against the local build tag
 # gives the installed system a `bootc switch` origin pointing at
 # `localhost/finpilot`, which no host can ever pull an update from, and the
-# recipe deliberately re-derives the published reference from the image's own
-# image-info.json to avoid exactly that. It also builds under `sudo podman run`
+# recipe deliberately re-derives the published repository from the image's own
+# image-info.json to avoid exactly that, while the channel comes from the tag
+# the caller named. It also builds under `sudo podman run`
 # into a temporary directory inside the repository, so a failure that skips the
 # cleanup trap leaves a root-owned `_build-bib.*` tree in the working copy.
 #
@@ -25,7 +26,7 @@
 # taken. Hosts without unprivileged user namespaces skip rather than escalate.
 #
 # Note: GitHub Actions hosted runners lack unprivileged user namespaces by default,
-# so these 22 cases will skip in standard CI and run in environments with userns enabled.
+# so these cases will skip in standard CI and run in environments with userns enabled.
 # Run with: bats tests/template/justfile-build-bib_test.bats
 
 SCRIPT_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")" && pwd)"
@@ -55,8 +56,10 @@ setup() {
     export PODMAN_LOG SUDO_LOG
 
     # What the `podman run --entrypoint /usr/bin/cat` of image-info.json
-    # reports. The ISO path reads the published reference out of this.
-    export STUB_IMAGE_INFO='{"image-ref":"ostree-image-signed:docker://ghcr.io/projectbluefin/finpilot","image-tag":"stable"}'
+    # reports. The ISO path reads the published repository out of this.
+    # CI only ever builds on main as stable-testing and promotes that digest to
+    # :stable, so the baked image-tag is stable-testing even in a stable image.
+    export STUB_IMAGE_INFO='{"image-ref":"ostree-image-signed:docker://ghcr.io/projectbluefin/finpilot","image-tag":"stable-testing"}'
     # Exit status for the BIB `podman run`; non-zero drives the cleanup trap.
     export STUB_BIB_STATUS=0
 
@@ -180,13 +183,34 @@ bib_run_args() {
 
 @test "build-iso strips the ostree transport prefix from image-ref" {
     # image-ref is an ostree source URI; BIB wants a bare registry reference.
-    export STUB_IMAGE_INFO='{"image-ref":"ostree-image-signed:docker://ghcr.io/example/img","image-tag":"testing"}'
-    run_just build-iso
+    export STUB_IMAGE_INFO='{"image-ref":"ostree-image-signed:docker://ghcr.io/example/img","image-tag":"stable-testing"}'
+    run_just build-iso localhost/finpilot testing
     [ "$status" -eq 0 ]
     args="$(bib_run_args)"
     [[ "${args}" == *"ghcr.io/example/img:testing"* ]]
     [[ "${args}" != *"docker://"* ]]
     [[ "${args}" != *"ostree-image-signed"* ]]
+}
+
+@test "build-iso takes the channel from the caller's tag, not the baked image-tag" {
+    # :stable is a digest copy of the :stable-testing build, so its baked
+    # image-tag says stable-testing. An ISO built from :stable must still give
+    # installed machines a :stable origin.
+    export STUB_IMAGE_INFO='{"image-ref":"ostree-image-signed:docker://ghcr.io/projectbluefin/finpilot","image-tag":"stable-testing"}'
+    run_just build-iso ghcr.io/projectbluefin/finpilot stable
+    [ "$status" -eq 0 ]
+    args="$(bib_run_args)"
+    [[ "${args}" == *"ghcr.io/projectbluefin/finpilot:stable" ]]
+    [[ "${args}" != *":stable-testing"* ]]
+    run grep -q ':stable-testing' "${PODMAN_LOG}"
+    [ "$status" -ne 0 ]
+}
+
+@test "build-iso targets stable-testing when the caller asks for it" {
+    export STUB_IMAGE_INFO='{"image-ref":"ostree-image-signed:docker://ghcr.io/projectbluefin/finpilot","image-tag":"stable"}'
+    run_just build-iso ghcr.io/projectbluefin/finpilot stable-testing
+    [ "$status" -eq 0 ]
+    [[ "$(bib_run_args)" == *"ghcr.io/projectbluefin/finpilot:stable-testing" ]]
 }
 
 @test "build-iso tags the local image with the published reference first" {
