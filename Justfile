@@ -2,7 +2,7 @@ export IMAGE_NAME := env("IMAGE_NAME", "finpilot")
 export DEFAULT_TAG := env("DEFAULT_TAG", "stable")
 export PODMAN := env("PODMAN", "podman")
 export REPO_ORG := env("GITHUB_REPOSITORY_OWNER", "projectbluefin")
-export bib_image := env("BIB_IMAGE", "ghcr.io/osbuild/bootc-image-builder:latest@sha256:a16ee1b37c5364ff5406db65a6bcd9baed61da50e20f365dfee5627f43d23b85")
+export bib_image := env("BIB_IMAGE", "ghcr.io/osbuild/bootc-image-builder:latest@sha256:65e94aef7a2452439dd9ef30064bfb2bd77dec9b73ceb5f3061c9292e8de2bcb")
 export qemu_image := env("QEMU_IMAGE", "ghcr.io/qemus/qemu:7.50@sha256:e7f6fda52503a546fd649670ba46e4bc23dc6dcef275bc3fac48877fbbc430df")
 export vm_ram := env("VM_RAM", "8192")
 export vm_cpus := env("VM_CPUS", "4")
@@ -309,15 +309,18 @@ _build-bib $target_image $tag $type $config: (_rootful_load_image target_image t
 
     # Bootc Image Builder records the post-install `bootc switch` origin from
     # the image reference it is given, so an ISO has to be built against the
-    # published reference instead of the local build tag. The image names
-    # itself in image-info.json, which keeps one source of truth for forks and
-    # means iso/iso.toml carries no image reference at all.
+    # published reference instead of the local build tag. The image names its
+    # repository in image-info.json, which keeps one source of truth for forks
+    # and means iso/iso.toml carries no image reference at all. The caller's tag
+    # names the channel: the baked image-tag is the compose-time tag, and
+    # `:stable` is a digest copy of the `:stable-testing` build, so trusting it
+    # would put every machine installed from a stable ISO on the test channel.
     build_image="${target_image}:${tag}"
     if [[ "${type}" == "iso" ]]; then
         image_info=$(just sudoif podman run --rm --entrypoint /usr/bin/cat \
             "${target_image}:${tag}" /usr/share/ublue-os/image-info.json)
         image_ref=$(jq -r '."image-ref"' <<<"${image_info}" | sed 's|.*docker://||')
-        build_image="${image_ref}:$(jq -r '."image-tag"' <<<"${image_info}")"
+        build_image="${image_ref}:${tag}"
         just sudoif podman tag "${target_image}:${tag}" "${build_image}"
     fi
 
