@@ -2,8 +2,8 @@
 # autopart --nohome and reboot --eject when there is no kickstart table, which
 # erases the first disk without asking, so the table below must stay.
 # Nothing here sets a disk layout, locale, user or timezone value: Anaconda asks.
-# The image reference is not here either; the Justfile reads it from the image's
-# image-info.json.
+# The image reference is not here either; the Justfile reads the repository
+# from the image's image-info.json and the channel from the tag it was given.
 
 [customizations.installer.kickstart]
 contents = """
