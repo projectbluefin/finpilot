@@ -25,7 +25,7 @@
 # taken. Hosts without unprivileged user namespaces skip rather than escalate.
 #
 # Note: GitHub Actions hosted runners lack unprivileged user namespaces by default,
-# so these 22 cases will skip in standard CI and run in environments with userns enabled.
+# so these cases will skip in standard CI and run in environments with userns enabled.
 # Run with: bats tests/template/justfile-build-bib_test.bats
 
 SCRIPT_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")" && pwd)"
@@ -56,7 +56,7 @@ setup() {
 
     # What the `podman run --entrypoint /usr/bin/cat` of image-info.json
     # reports. The ISO path reads the published reference out of this.
-    export STUB_IMAGE_INFO='{"image-ref":"ostree-image-signed:docker://ghcr.io/projectbluefin/finpilot","image-tag":"stable"}'
+    export STUB_IMAGE_INFO='{"image-ref":"ostree-image-signed:docker://ghcr.io/projectbluefin/finpilot","image-tag":"stable-testing"}'
     # Exit status for the BIB `podman run`; non-zero drives the cleanup trap.
     export STUB_BIB_STATUS=0
 
@@ -178,13 +178,30 @@ bib_run_args() {
     [[ "${args}" != *"localhost/finpilot:stable"* ]]
 }
 
+@test "build-iso preserves the stable channel after digest promotion" {
+    # CI bakes stable-testing into the image; promotion copies that same digest.
+    run_just build-iso ghcr.io/projectbluefin/finpilot stable
+    [ "$status" -eq 0 ]
+    [[ "$(bib_run_args)" == *"ghcr.io/projectbluefin/finpilot:stable" ]]
+    grep -qFx "tag ghcr.io/projectbluefin/finpilot:stable ghcr.io/projectbluefin/finpilot:stable" "${PODMAN_LOG}"
+    run grep -F ':stable-testing' "${PODMAN_LOG}"
+    [ "$status" -ne 0 ]
+}
+
+@test "build-iso honours an explicit testing channel" {
+    run_just build-iso ghcr.io/projectbluefin/finpilot stable-testing
+    [ "$status" -eq 0 ]
+    [[ "$(bib_run_args)" == *"ghcr.io/projectbluefin/finpilot:stable-testing" ]]
+    grep -qFx "tag ghcr.io/projectbluefin/finpilot:stable-testing ghcr.io/projectbluefin/finpilot:stable-testing" "${PODMAN_LOG}"
+}
+
 @test "build-iso strips the ostree transport prefix from image-ref" {
     # image-ref is an ostree source URI; BIB wants a bare registry reference.
     export STUB_IMAGE_INFO='{"image-ref":"ostree-image-signed:docker://ghcr.io/example/img","image-tag":"testing"}'
     run_just build-iso
     [ "$status" -eq 0 ]
     args="$(bib_run_args)"
-    [[ "${args}" == *"ghcr.io/example/img:testing"* ]]
+    [[ "${args}" == *"ghcr.io/example/img:stable"* ]]
     [[ "${args}" != *"docker://"* ]]
     [[ "${args}" != *"ostree-image-signed"* ]]
 }

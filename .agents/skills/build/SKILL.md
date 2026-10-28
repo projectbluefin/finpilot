@@ -43,6 +43,15 @@ just check            # verify Justfile syntax
 and is overridable by the `IMAGE_NAME` environment variable; CI sets that from
 the repository name.
 
+## Installer image identity
+
+For ISO builds, `_build-bib` reads the published repository from the image's
+`image-info.json` and combines it with the caller's tag. Never use the baked
+`image-tag` to choose the installed channel: promotion copies the same digest
+from `stable-testing` to `stable` without changing that metadata. Keep the
+promotion regression in `tests/template/justfile-build-bib_test.bats` using
+`stable-testing` metadata with a caller requesting `stable`.
+
 ## Pinning
 
 Every OCI reference is pinned by digest and updated by Renovate: the base image,
