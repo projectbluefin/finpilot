@@ -43,6 +43,12 @@ just check            # verify Justfile syntax
 and is overridable by the `IMAGE_NAME` environment variable; CI sets that from
 the repository name.
 
+`build-iso` gives installed machines a `bootc` origin built from the image's
+`image-info.json` `image-ref` plus the tag you pass, e.g. `just build-iso
+ghcr.io/projectbluefin/finpilot stable`. Never read the channel from the baked
+`image-tag`: CI builds only as `stable-testing` and `:stable` is a digest copy,
+so that value is `stable-testing` even in the stable image.
+
 ## Pinning
 
 Every OCI reference is pinned by digest and updated by Renovate: the base image,
