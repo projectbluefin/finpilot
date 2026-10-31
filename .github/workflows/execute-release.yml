@@ -72,7 +72,7 @@ jobs:
       issues: write
       packages: write
       pull-requests: write
-    uses: projectbluefin/actions/.github/workflows/reusable-execute-release.yml@569fdb93de638c31449ad223545975fa86df1a4d # v1
+    uses: projectbluefin/actions/.github/workflows/reusable-execute-release.yml@d0abf8999cf9fe16d2ef5bdc2a42a91ce8809645 # v1
     with:
       registry: ghcr.io/${{ github.repository_owner }}
       variants: >-
@@ -103,7 +103,7 @@ jobs:
       packages: read
     # Finpilot's direct build does not upload an SBOM artifact. The supported
     # reusable inline mode scans the already-promoted stable image instead.
-    uses: projectbluefin/actions/.github/workflows/reusable-release.yml@569fdb93de638c31449ad223545975fa86df1a4d # v1
+    uses: projectbluefin/actions/.github/workflows/reusable-release.yml@d0abf8999cf9fe16d2ef5bdc2a42a91ce8809645 # v1
     with:
       stream_name: stable
       image: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}
