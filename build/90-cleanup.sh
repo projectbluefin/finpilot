@@ -27,7 +27,7 @@ dnf5 versionlock clear
 # each COPR it uses; this is the backstop for anything else the build enabled.
 disable_repo_file() {
 	[[ -f "$1" ]] || return 0
-	sed -i -E 's@^[[:space:]]*enabled[[:space:]]*=.*@enabled=0@' "$1"
+	sed -i -E 's@^[[:space:]]*enabled[[:space:]]*=.*@enabled=0@I' "$1"
 }
 
 for repo_file in "${REPOS_DIR}"/_copr:*.repo "${REPOS_DIR}"/_copr_*.repo "${REPOS_DIR}"/rpmfusion-*.repo; do

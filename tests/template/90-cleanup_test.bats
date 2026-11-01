@@ -168,7 +168,9 @@ run_cleanup() {
 
 @test "90-cleanup: guard fails the build when a third-party repository is still enabled" {
 	# A sed that succeeds without editing leaves the repository enabled, which
-	# only the final guard can catch.
+	# only the final guard can catch. Drop the enabled COPR seeded by setup()
+	# so the guard reports the rpmfusion file this test targets.
+	rm -f "${REPOS_DIR}"/_copr:*.repo
 	printf '[rpmfusion]\nenabled = true\n' >"${REPOS_DIR}/rpmfusion-free.repo"
 	printf '#!/usr/bin/bash\nexit 0\n' >"${STUB_BIN}/sed"
 	chmod +x "${STUB_BIN}/sed"
