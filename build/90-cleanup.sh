@@ -27,7 +27,7 @@ dnf5 versionlock clear
 # each COPR it uses; this is the backstop for anything else the build enabled.
 disable_repo_file() {
 	[[ -f "$1" ]] || return 0
-	sed -i 's@enabled=1@enabled=0@g' "$1"
+	sed -i -E 's@^[[:space:]]*enabled[[:space:]]*=.*@enabled=0@I' "$1"
 }
 
 for repo_file in "${REPOS_DIR}"/_copr:*.repo "${REPOS_DIR}"/_copr_*.repo "${REPOS_DIR}"/rpmfusion-*.repo; do
@@ -40,7 +40,7 @@ done
 # Fail loudly rather than shipping a third-party repository that is still live.
 for repo_file in "${REPOS_DIR}"/_copr:*.repo "${REPOS_DIR}"/_copr_*.repo "${REPOS_DIR}"/rpmfusion-*.repo; do
 	[[ -f "${repo_file}" ]] || continue
-	if grep -qE '^enabled=1' "${repo_file}"; then
+	if grep -qiE '^[[:space:]]*enabled[[:space:]]*=[[:space:]]*(1|true|yes|on)[[:space:]]*$' "${repo_file}"; then
 		echo "::error::third-party repository still enabled: $(basename "${repo_file}")" >&2
 		exit 1
 	fi

@@ -140,8 +140,8 @@ run_cleanup() {
 	grep -q '^enabled=0' "${REPOS_DIR}/_copr:copr.fedorainfracloud.org:ublue-os:packages.repo"
 }
 
-@test "90-cleanup: fails the build when a third-party repository cannot be disabled" {
-	# The build must never ship a live third-party repository, so a repository
+@test "90-cleanup: fails the build when sed cannot rewrite a third-party repository" {
+	# This covers the sed failure under set -e, not the final guard. The build must never ship a live third-party repository, so a repository
 	# the script cannot rewrite is a hard failure. sed -i needs a writable
 	# directory rather than a writable file, and root bypasses permissions.
 	[ "$(id -u)" -ne 0 ] || skip "file permissions do not apply to root"
@@ -150,6 +150,34 @@ run_cleanup() {
 	run_cleanup
 	[ "$status" -ne 0 ]
 	chmod 700 "${REPOS_DIR}"
+}
+
+@test "90-cleanup: disables third-party repositories whatever spelling enables them" {
+	printf '[copr]\nenabled = 1\n' \
+		>"${REPOS_DIR}/_copr:copr.fedorainfracloud.org:ublue-os:packages.repo"
+	printf '[rpmfusion]\nenabled=true\n' >"${REPOS_DIR}/rpmfusion-free.repo"
+	printf '[multimedia]\nEnabled = Yes\n' >"${REPOS_DIR}/fedora-multimedia.repo"
+
+	run_cleanup
+	[ "$status" -eq 0 ]
+
+	grep -qx 'enabled=0' "${REPOS_DIR}/_copr:copr.fedorainfracloud.org:ublue-os:packages.repo"
+	grep -qx 'enabled=0' "${REPOS_DIR}/rpmfusion-free.repo"
+	grep -qx 'enabled=0' "${REPOS_DIR}/fedora-multimedia.repo"
+}
+
+@test "90-cleanup: guard fails the build when a third-party repository is still enabled" {
+	# A sed that succeeds without editing leaves the repository enabled, which
+	# only the final guard can catch. Drop the enabled COPR seeded by setup()
+	# so the guard reports the rpmfusion file this test targets.
+	rm -f "${REPOS_DIR}"/_copr:*.repo
+	printf '[rpmfusion]\nenabled = true\n' >"${REPOS_DIR}/rpmfusion-free.repo"
+	printf '#!/usr/bin/bash\nexit 0\n' >"${STUB_BIN}/sed"
+	chmod +x "${STUB_BIN}/sed"
+
+	run_cleanup
+	[ "$status" -eq 1 ]
+	[[ "$output" == *"::error::third-party repository still enabled: rpmfusion-free.repo"* ]]
 }
 
 @test "90-cleanup: removes the root .gitkeep placeholder" {
