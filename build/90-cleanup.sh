@@ -30,15 +30,23 @@ disable_repo_file() {
 	sed -i -E 's@^[[:space:]]*enabled[[:space:]]*=.*@enabled=0@I' "$1"
 }
 
-for repo_file in "${REPOS_DIR}"/_copr:*.repo "${REPOS_DIR}"/_copr_*.repo "${REPOS_DIR}"/rpmfusion-*.repo; do
-	disable_repo_file "${repo_file}"
-done
+# One list feeds both the disable pass and the guard below, so a repository
+# the script knows how to disable is always one the guard re-checks.
+third_party_repo_files=(
+	"${REPOS_DIR}"/_copr:*.repo
+	"${REPOS_DIR}"/_copr_*.repo
+	"${REPOS_DIR}"/rpmfusion-*.repo
+)
 for repo_name in fedora-multimedia tailscale fedora-cisco-openh264 fedora-coreos-pool; do
-	disable_repo_file "${REPOS_DIR}/${repo_name}.repo"
+	third_party_repo_files+=("${REPOS_DIR}/${repo_name}.repo")
+done
+
+for repo_file in "${third_party_repo_files[@]}"; do
+	disable_repo_file "${repo_file}"
 done
 
 # Fail loudly rather than shipping a third-party repository that is still live.
-for repo_file in "${REPOS_DIR}"/_copr:*.repo "${REPOS_DIR}"/_copr_*.repo "${REPOS_DIR}"/rpmfusion-*.repo; do
+for repo_file in "${third_party_repo_files[@]}"; do
 	[[ -f "${repo_file}" ]] || continue
 	if grep -qiE '^[[:space:]]*enabled[[:space:]]*=[[:space:]]*(1|true|yes|on)[[:space:]]*$' "${repo_file}"; then
 		echo "::error::third-party repository still enabled: $(basename "${repo_file}")" >&2
