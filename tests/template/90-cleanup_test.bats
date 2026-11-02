@@ -180,6 +180,19 @@ run_cleanup() {
 	[[ "$output" == *"::error::third-party repository still enabled: rpmfusion-free.repo"* ]]
 }
 
+@test "90-cleanup: guard fails the build when a named third-party repository is still enabled" {
+	# The named repositories (fedora-multimedia, tailscale, ...) are disabled by
+	# a separate list from the glob-matched ones; the guard must cover them too.
+	rm -f "${REPOS_DIR}"/_copr:*.repo "${REPOS_DIR}"/rpmfusion-*.repo
+	printf '[multimedia]\nenabled=1\n' >"${REPOS_DIR}/fedora-multimedia.repo"
+	printf '#!/usr/bin/bash\nexit 0\n' >"${STUB_BIN}/sed"
+	chmod +x "${STUB_BIN}/sed"
+
+	run_cleanup
+	[ "$status" -eq 1 ]
+	[[ "$output" == *"::error::third-party repository still enabled: fedora-multimedia.repo"* ]]
+}
+
 @test "90-cleanup: removes the root .gitkeep placeholder" {
 	run_cleanup
 	[ "$status" -eq 0 ]
