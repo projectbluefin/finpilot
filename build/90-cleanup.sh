@@ -41,6 +41,31 @@ for repo_name in fedora-multimedia tailscale fedora-cisco-openh264 fedora-coreos
 	third_party_repo_files+=("${REPOS_DIR}/${repo_name}.repo")
 done
 
+# A vendor repository the build added (for example vscode.repo from an
+# addrepo, or nvidia-container-toolkit.repo from a curl) has no fixed name in
+# this list, so classify by ownership too: base Fedora repo files are owned by
+# fedora-repos*, while anything dnf5, config-manager or a script writes is
+# owned by nothing and is therefore third-party. De-duplicate below, since the
+# ownership pass can name a file the fixed list already covers.
+for repo_file in "${REPOS_DIR}"/*.repo; do
+	[[ -f "${repo_file}" ]] || continue
+	rpm -qf "${repo_file}" >/dev/null 2>&1 && continue
+	third_party_repo_files+=("${repo_file}")
+done
+
+# The fixed globs and the ownership pass can name the same file twice, so
+# de-duplicate before both loops see the list.
+if command -v rpm >/dev/null 2>&1; then
+	declare -A third_party_seen=()
+	third_party_unique=()
+	for repo_file in "${third_party_repo_files[@]}"; do
+		[[ -n "${third_party_seen["${repo_file}"]:-}" ]] && continue
+		third_party_seen["${repo_file}"]=1
+		third_party_unique+=("${repo_file}")
+	done
+	third_party_repo_files=("${third_party_unique[@]}")
+fi
+
 for repo_file in "${third_party_repo_files[@]}"; do
 	disable_repo_file "${repo_file}"
 done

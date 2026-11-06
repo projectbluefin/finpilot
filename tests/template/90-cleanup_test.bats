@@ -67,6 +67,16 @@ EOF
 exit 1
 EOF
 	chmod +x "${STUB_BIN}/mountpoint"
+
+	# rpm(1) classifies a .repo file as base-owned only when an installed RPM
+	# owns it. fedora.repo is provided by fedora-repos; every file the build
+	# added (copr, addrepo, curl) is unowned, so ownership says third-party.
+	cat >"${STUB_BIN}/rpm" <<'EOF'
+#!/usr/bin/bash
+[[ "$(basename "$2")" == "fedora.repo" ]] && exit 0
+exit 1
+EOF
+	chmod +x "${STUB_BIN}/rpm"
 }
 
 teardown() {
@@ -191,6 +201,33 @@ run_cleanup() {
 	run_cleanup
 	[ "$status" -eq 1 ]
 	[[ "$output" == *"::error::third-party repository still enabled: fedora-multimedia.repo"* ]]
+}
+
+@test "90-cleanup: disables an unowned third-party repository the name list misses" {
+	# A vendor repository the build added (for example vscode.repo from an
+	# addrepo) has no fixed name in the list, so ownership classification must
+	# still disable it before the guard runs.
+	printf '[vscode]\nenabled=1\n' >"${REPOS_DIR}/vscode.repo"
+
+	run_cleanup
+	[ "$status" -eq 0 ]
+
+	grep -q '^enabled=0' "${REPOS_DIR}/vscode.repo"
+}
+
+@test "90-cleanup: guard fails the build when an unowned third-party repository is still enabled" {
+	# An unowned repository the build added is caught by the guard even when
+	# sed is a no-op, so a rewrite that changes nothing still fails the build.
+	# Drop the seeded repos first so the guard reports vscode.repo, not one of
+	# the files setup() left enabled.
+	rm -f "${REPOS_DIR}"/_copr:*.repo "${REPOS_DIR}"/rpmfusion-*.repo "${REPOS_DIR}"/fedora-multimedia.repo
+	printf '[vscode]\nenabled = true\n' >"${REPOS_DIR}/vscode.repo"
+	printf '#!/usr/bin/bash\nexit 0\n' >"${STUB_BIN}/sed"
+	chmod +x "${STUB_BIN}/sed"
+
+	run_cleanup
+	[ "$status" -eq 1 ]
+	[[ "$output" == *"::error::third-party repository still enabled: vscode.repo"* ]]
 }
 
 @test "90-cleanup: removes the root .gitkeep placeholder" {
