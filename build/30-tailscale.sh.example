@@ -32,7 +32,9 @@ dnf5 config-manager addrepo --overwrite \
 dnf5 install -y tailscale
 
 # Remove the repository file. A third-party repository is a build-time source
-# only; 90-cleanup.sh also disables tailscale.repo as a backstop.
+# only; 90-cleanup.sh also disables tailscale.repo as a backstop, and now
+# disables every other repository the build added by ownership, not just by
+# name.
 rm -f /etc/yum.repos.d/tailscale.repo
 
 echo "::endgroup::"
