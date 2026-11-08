@@ -71,13 +71,16 @@ for repo_file in "${third_party_repo_files[@]}"; do
 done
 
 # Fail loudly rather than shipping a third-party repository that is still live.
-for repo_file in "${third_party_repo_files[@]}"; do
-	[[ -f "${repo_file}" ]] || continue
-	if grep -qiE '^[[:space:]]*enabled[[:space:]]*=[[:space:]]*(1|true|yes|on)[[:space:]]*$' "${repo_file}"; then
-		echo "::error::third-party repository still enabled: $(basename "${repo_file}")" >&2
-		exit 1
-	fi
-done
+# Ask dnf which repositories are actually enabled, rather than pattern-matching
+# the .repo files: a repository that ships with no enabled= key is enabled by
+# dnf's default and slips past both the rewrite above and a grep of the file.
+# The allowlist is Fedora's own repository id prefix; anything else that dnf
+# reports as live leaked through the disable pass and fails the build.
+live="$(dnf5 -q repo list --enabled | awk '$1!="Id" && $1!="Id:" {print $1}' | grep -vE '^(fedora|updates)' || true)"
+if [ -n "${live}" ]; then
+	echo "::error::third-party repository still enabled: ${live}" >&2
+	exit 1
+fi
 
 echo "::endgroup::"
 

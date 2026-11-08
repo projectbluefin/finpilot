@@ -49,6 +49,12 @@ setup() {
 	cat >"${STUB_BIN}/dnf5" <<'EOF'
 #!/usr/bin/bash
 printf '%s\n' "$*" >> "${DNF5_LOG}"
+# `dnf5 repo list --enabled` is what the guard re-checks. A test sets
+# DNF5_REPO_LIST to simulate dnf's view of enabled repositories; unset means
+# dnf lists none and the guard passes.
+case " $* " in
+  *" repo list "*) [ -n "${DNF5_REPO_LIST:-}" ] && printf '%s\n' "${DNF5_REPO_LIST}" ;;
+esac
 exit 0
 EOF
 	chmod +x "${STUB_BIN}/dnf5"
@@ -106,9 +112,10 @@ run_cleanup() {
 	[ "$status" -eq 0 ]
 
 	mapfile -t calls <"${DNF5_LOG}"
-	[ "${#calls[@]}" -eq 2 ]
+	[ "${#calls[@]}" -eq 3 ]
 	[ "${calls[0]}" = "config-manager unsetopt keepcache install_weak_deps" ]
 	[ "${calls[1]}" = "versionlock clear" ]
+	[ "${calls[2]}" = "-q repo list --enabled" ]
 }
 
 @test "90-cleanup: disables and masks the fedora flatpak service and the base updater" {
@@ -176,31 +183,22 @@ run_cleanup() {
 	grep -qx 'enabled=0' "${REPOS_DIR}/fedora-multimedia.repo"
 }
 
-@test "90-cleanup: guard fails the build when a third-party repository is still enabled" {
-	# A sed that succeeds without editing leaves the repository enabled, which
-	# only the final guard can catch. Drop the enabled COPR seeded by setup()
-	# so the guard reports the rpmfusion file this test targets.
-	rm -f "${REPOS_DIR}"/_copr:*.repo
-	printf '[rpmfusion]\nenabled = true\n' >"${REPOS_DIR}/rpmfusion-free.repo"
-	printf '#!/usr/bin/bash\nexit 0\n' >"${STUB_BIN}/sed"
-	chmod +x "${STUB_BIN}/sed"
-
-	run_cleanup
+@test "90-cleanup: guard fails the build when dnf reports a third-party repository enabled" {
+	# A repository dnf still lists as enabled leaked through the disable pass.
+	# The guard asks dnf which repositories are live, so the test seeds dnf's
+	# view with the leaked repository id via DNF5_REPO_LIST.
+	DNF5_REPO_LIST="rpmfusion-free" run_cleanup
 	[ "$status" -eq 1 ]
-	[[ "$output" == *"::error::third-party repository still enabled: rpmfusion-free.repo"* ]]
+	[[ "$output" == *"::error::third-party repository still enabled: rpmfusion-free"* ]]
 }
 
 @test "90-cleanup: guard fails the build when a named third-party repository is still enabled" {
-	# The named repositories (fedora-multimedia, tailscale, ...) are disabled by
-	# a separate list from the glob-matched ones; the guard must cover them too.
-	rm -f "${REPOS_DIR}"/_copr:*.repo "${REPOS_DIR}"/rpmfusion-*.repo
-	printf '[multimedia]\nenabled=1\n' >"${REPOS_DIR}/fedora-multimedia.repo"
-	printf '#!/usr/bin/bash\nexit 0\n' >"${STUB_BIN}/sed"
-	chmod +x "${STUB_BIN}/sed"
-
-	run_cleanup
+	# The named repositories (tailscale, ...) are disabled by a separate list
+	# from the glob-matched ones; the guard must cover them too. tailscale is an
+	# outside source, so dnf reporting it as live fails the build.
+	DNF5_REPO_LIST="tailscale" run_cleanup
 	[ "$status" -eq 1 ]
-	[[ "$output" == *"::error::third-party repository still enabled: fedora-multimedia.repo"* ]]
+	[[ "$output" == *"::error::third-party repository still enabled: tailscale"* ]]
 }
 
 @test "90-cleanup: disables an unowned third-party repository the name list misses" {
@@ -216,18 +214,29 @@ run_cleanup() {
 }
 
 @test "90-cleanup: guard fails the build when an unowned third-party repository is still enabled" {
-	# An unowned repository the build added is caught by the guard even when
-	# sed is a no-op, so a rewrite that changes nothing still fails the build.
-	# Drop the seeded repos first so the guard reports vscode.repo, not one of
-	# the files setup() left enabled.
-	rm -f "${REPOS_DIR}"/_copr:*.repo "${REPOS_DIR}"/rpmfusion-*.repo "${REPOS_DIR}"/fedora-multimedia.repo
-	printf '[vscode]\nenabled = true\n' >"${REPOS_DIR}/vscode.repo"
-	printf '#!/usr/bin/bash\nexit 0\n' >"${STUB_BIN}/sed"
-	chmod +x "${STUB_BIN}/sed"
-
-	run_cleanup
+	# An unowned repository the build added has no fixed name in the disable
+	# list, so the guard must catch it via dnf. Seed dnf's view with the repo id.
+	DNF5_REPO_LIST="vscode" run_cleanup
 	[ "$status" -eq 1 ]
-	[[ "$output" == *"::error::third-party repository still enabled: vscode.repo"* ]]
+	[[ "$output" == *"::error::third-party repository still enabled: vscode"* ]]
+}
+
+@test "90-cleanup: guard passes when dnf reports only Fedora repositories" {
+	# Fedora's own repositories (fedora, fedora-updates, fedora-cisco-openh264)
+	# are the only ones the build may ship enabled.
+	DNF5_REPO_LIST="fedora fedora-updates fedora-cisco-openh264" run_cleanup
+	[ "$status" -eq 0 ]
+}
+
+@test "90-cleanup: guard catches a repository that ships with no enabled= key" {
+	# A repository that ships with no enabled= key is enabled by dnf's default.
+	# The guard asks dnf, so it catches such a repository even though a grep of
+	# its file would miss it. Here dnf reports the repository as live while its
+	# file has no enabled= key at all.
+	printf '[leaked]\n\ntype=rpmfusion\n' >"${REPOS_DIR}/leaked.repo"
+	DNF5_REPO_LIST="leaked" run_cleanup
+	[ "$status" -eq 1 ]
+	[[ "$output" == *"::error::third-party repository still enabled: leaked"* ]]
 }
 
 @test "90-cleanup: removes the root .gitkeep placeholder" {
