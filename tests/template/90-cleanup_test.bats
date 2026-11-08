@@ -67,6 +67,16 @@ EOF
 exit 1
 EOF
 	chmod +x "${STUB_BIN}/mountpoint"
+
+	# rpm(1) classifies a .repo file as base-owned only when an installed RPM
+	# owns it. fedora.repo is provided by fedora-repos; every file the build
+	# added (copr, addrepo, curl) is unowned, so ownership says third-party.
+	cat >"${STUB_BIN}/rpm" <<'EOF'
+#!/usr/bin/bash
+[[ "$(basename "$2")" == "fedora.repo" ]] && exit 0
+exit 1
+EOF
+	chmod +x "${STUB_BIN}/rpm"
 }
 
 teardown() {
@@ -140,8 +150,8 @@ run_cleanup() {
 	grep -q '^enabled=0' "${REPOS_DIR}/_copr:copr.fedorainfracloud.org:ublue-os:packages.repo"
 }
 
-@test "90-cleanup: fails the build when a third-party repository cannot be disabled" {
-	# The build must never ship a live third-party repository, so a repository
+@test "90-cleanup: fails the build when sed cannot rewrite a third-party repository" {
+	# This covers the sed failure under set -e, not the final guard. The build must never ship a live third-party repository, so a repository
 	# the script cannot rewrite is a hard failure. sed -i needs a writable
 	# directory rather than a writable file, and root bypasses permissions.
 	[ "$(id -u)" -ne 0 ] || skip "file permissions do not apply to root"
@@ -150,6 +160,74 @@ run_cleanup() {
 	run_cleanup
 	[ "$status" -ne 0 ]
 	chmod 700 "${REPOS_DIR}"
+}
+
+@test "90-cleanup: disables third-party repositories whatever spelling enables them" {
+	printf '[copr]\nenabled = 1\n' \
+		>"${REPOS_DIR}/_copr:copr.fedorainfracloud.org:ublue-os:packages.repo"
+	printf '[rpmfusion]\nenabled=true\n' >"${REPOS_DIR}/rpmfusion-free.repo"
+	printf '[multimedia]\nEnabled = Yes\n' >"${REPOS_DIR}/fedora-multimedia.repo"
+
+	run_cleanup
+	[ "$status" -eq 0 ]
+
+	grep -qx 'enabled=0' "${REPOS_DIR}/_copr:copr.fedorainfracloud.org:ublue-os:packages.repo"
+	grep -qx 'enabled=0' "${REPOS_DIR}/rpmfusion-free.repo"
+	grep -qx 'enabled=0' "${REPOS_DIR}/fedora-multimedia.repo"
+}
+
+@test "90-cleanup: guard fails the build when a third-party repository is still enabled" {
+	# A sed that succeeds without editing leaves the repository enabled, which
+	# only the final guard can catch. Drop the enabled COPR seeded by setup()
+	# so the guard reports the rpmfusion file this test targets.
+	rm -f "${REPOS_DIR}"/_copr:*.repo
+	printf '[rpmfusion]\nenabled = true\n' >"${REPOS_DIR}/rpmfusion-free.repo"
+	printf '#!/usr/bin/bash\nexit 0\n' >"${STUB_BIN}/sed"
+	chmod +x "${STUB_BIN}/sed"
+
+	run_cleanup
+	[ "$status" -eq 1 ]
+	[[ "$output" == *"::error::third-party repository still enabled: rpmfusion-free.repo"* ]]
+}
+
+@test "90-cleanup: guard fails the build when a named third-party repository is still enabled" {
+	# The named repositories (fedora-multimedia, tailscale, ...) are disabled by
+	# a separate list from the glob-matched ones; the guard must cover them too.
+	rm -f "${REPOS_DIR}"/_copr:*.repo "${REPOS_DIR}"/rpmfusion-*.repo
+	printf '[multimedia]\nenabled=1\n' >"${REPOS_DIR}/fedora-multimedia.repo"
+	printf '#!/usr/bin/bash\nexit 0\n' >"${STUB_BIN}/sed"
+	chmod +x "${STUB_BIN}/sed"
+
+	run_cleanup
+	[ "$status" -eq 1 ]
+	[[ "$output" == *"::error::third-party repository still enabled: fedora-multimedia.repo"* ]]
+}
+
+@test "90-cleanup: disables an unowned third-party repository the name list misses" {
+	# A vendor repository the build added (for example vscode.repo from an
+	# addrepo) has no fixed name in the list, so ownership classification must
+	# still disable it before the guard runs.
+	printf '[vscode]\nenabled=1\n' >"${REPOS_DIR}/vscode.repo"
+
+	run_cleanup
+	[ "$status" -eq 0 ]
+
+	grep -q '^enabled=0' "${REPOS_DIR}/vscode.repo"
+}
+
+@test "90-cleanup: guard fails the build when an unowned third-party repository is still enabled" {
+	# An unowned repository the build added is caught by the guard even when
+	# sed is a no-op, so a rewrite that changes nothing still fails the build.
+	# Drop the seeded repos first so the guard reports vscode.repo, not one of
+	# the files setup() left enabled.
+	rm -f "${REPOS_DIR}"/_copr:*.repo "${REPOS_DIR}"/rpmfusion-*.repo "${REPOS_DIR}"/fedora-multimedia.repo
+	printf '[vscode]\nenabled = true\n' >"${REPOS_DIR}/vscode.repo"
+	printf '#!/usr/bin/bash\nexit 0\n' >"${STUB_BIN}/sed"
+	chmod +x "${STUB_BIN}/sed"
+
+	run_cleanup
+	[ "$status" -eq 1 ]
+	[[ "$output" == *"::error::third-party repository still enabled: vscode.repo"* ]]
 }
 
 @test "90-cleanup: removes the root .gitkeep placeholder" {
