@@ -29,11 +29,16 @@ setup() {
 	# The header dnf prints (Id State Name) is skipped by content, not by line
 	# number, so a copr: repository that sorts first is still caught.
 	grep -qF 'dnf5 -q repo list --enabled' "${CLEANUP_SRC}"
-	grep -qF '$1!="Id"' "${CLEANUP_SRC}"
+	grep -qF '$1 == "repo" && $2 == "id"' "${CLEANUP_SRC}"
 }
 
-@test "the gate allowlists only Fedora's own repository id prefix" {
-	grep -qF "grep -vE '^(fedora|updates)'" "${CLEANUP_SRC}"
+@test "the gate allowlists only exact Fedora repository ids" {
+	grep -qF 'split("fedora updates fedora-updates fedora-cisco-openh264"' "${CLEANUP_SRC}"
+	! grep -qF "grep -vE '^(fedora|updates)'" "${CLEANUP_SRC}"
+}
+
+@test "the gate fails the build when the dnf query fails" {
+	grep -qF 'could not query enabled repositories' "${CLEANUP_SRC}"
 }
 
 @test "the gate fails the build on a leaked repository" {

@@ -53,7 +53,7 @@ printf '%s\n' "$*" >> "${DNF5_LOG}"
 # DNF5_REPO_LIST to simulate dnf's view of enabled repositories; unset means
 # dnf lists none and the guard passes.
 case " $* " in
-  *" repo list "*) [ -n "${DNF5_REPO_LIST:-}" ] && printf '%s\n' "${DNF5_REPO_LIST}" ;;
+  *" repo list "*) [ -n "${DNF5_REPO_FAIL:-}" ] && exit "${DNF5_REPO_FAIL}"; [ -n "${DNF5_REPO_LIST:-}" ] && printf '%s\n' "${DNF5_REPO_LIST}" ;;
 esac
 exit 0
 EOF
@@ -226,6 +226,30 @@ run_cleanup() {
 	# are the only ones the build may ship enabled.
 	DNF5_REPO_LIST="fedora fedora-updates fedora-cisco-openh264" run_cleanup
 	[ "$status" -eq 0 ]
+}
+
+@test "90-cleanup: guard passes on a realistic dnf5 table with a heading" {
+	DNF5_REPO_LIST=$'repo id                 repo name\nfedora                  Fedora 44\nupdates                 Fedora 44 - Updates' run_cleanup
+	[ "$status" -eq 0 ]
+}
+
+@test "90-cleanup: guard keeps every row of a multiline table" {
+	DNF5_REPO_LIST=$'repo id   repo name\nfedora    Fedora 44\nvscode    Visual Studio Code' run_cleanup
+	[ "$status" -eq 1 ]
+	[[ "$output" == *"still enabled: vscode"* ]]
+}
+
+@test "90-cleanup: guard fails the build when the dnf query fails" {
+	DNF5_REPO_FAIL=42 run_cleanup
+	[ "$status" -eq 1 ]
+	[[ "$output" == *"::error::could not query enabled repositories"* ]]
+}
+
+@test "90-cleanup: guard rejects a Fedora-like third-party repository with no enabled= key" {
+	printf '[fedora-multimedia]\nname=multimedia\n' >"${REPOS_DIR}/fedora-multimedia.repo"
+	DNF5_REPO_LIST="fedora-multimedia" run_cleanup
+	[ "$status" -eq 1 ]
+	[[ "$output" == *"still enabled: fedora-multimedia"* ]]
 }
 
 @test "90-cleanup: guard catches a repository that ships with no enabled= key" {
