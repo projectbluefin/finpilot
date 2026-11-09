@@ -21,4 +21,4 @@ jobs:
   validate:
     permissions:
       contents: read
-    uses: projectbluefin/actions/.github/workflows/reusable-validate-renovate.yml@d0abf8999cf9fe16d2ef5bdc2a42a91ce8809645 # v1
+    uses: projectbluefin/actions/.github/workflows/reusable-validate-renovate.yml@6453818f6279a2f2c1282919aad0009a88c01819 # v1
