@@ -120,3 +120,14 @@ Acquire::Retries=2` to each so a stalled socket fails fast from either
 half, and `--no-install-recommends` to skip the `bats-doc` package the
 workflow never reads. The wall-clock cap is what catches a slow-but-alive
 mirror; the per-call timeouts only fire on inactivity.
+
+## Skipped cases pass the job
+
+bats reports a skipped case as `ok … # skip`, so `unit-tests.yml` stays green
+when a whole file skips. `ubuntu-latest` has no unprivileged user namespaces, so
+a case gated on `unshare -r` never runs in CI. Stub privileged commands on PATH
+instead: `sudoif` resolves `sudo` with `command -v` and the recipes call it by
+name, so one recording stub catches both, and setting `SUDO_USER`
+short-circuits `_rootful_load_image`. The installer-build file was
+namespace-gated and skipped all 24 cases until issue #660. Only the `run-vm`
+cases still need a namespace, for the tmpfs over firmware paths.

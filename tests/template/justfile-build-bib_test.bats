@@ -19,14 +19,16 @@
 # the tests assert on the argument vector `bootc-image-builder` would have
 # received without running a privileged container or building a disk.
 #
-# The Justfile reaches the privileged commands through its own `sudoif`
-# dispatcher, which hardcodes `/usr/bin/sudo` and cannot be stubbed; its root
-# branch runs the command directly instead. The suite therefore runs inside a
-# `unshare -r` user namespace, where the caller is uid 0 and that root branch is
-# taken. Hosts without unprivileged user namespaces skip rather than escalate.
+# Every privileged command lands on those stubs without a user namespace or
+# real escalation. `sudoif` resolves `sudo` with `command -v`, so an unprivileged
+# caller reaches the recording stub, which re-runs the command unprivileged
+# inside the sandbox; `_build-bib` calls `sudo` by name for the build, the move
+# and the chown, which reaches the same stub. `run_just` sets SUDO_USER so
+# `_rootful_load_image` takes its already-escalated short circuit: the
+# rootless-to-rootful image handoff is covered by
+# justfile-rootful-load_test.bats, and these cases assert only on what
+# `_build-bib` does.
 #
-# Note: GitHub Actions hosted runners lack unprivileged user namespaces by default,
-# so these cases will skip in standard CI and run in environments with userns enabled.
 # Run with: bats tests/template/justfile-build-bib_test.bats
 
 SCRIPT_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")" && pwd)"
@@ -35,9 +37,6 @@ REPO_ROOT="${SCRIPT_DIR}/../.."
 setup() {
     if ! command -v just &>/dev/null; then
         skip "just is not installed"
-    fi
-    if ! command -v unshare &>/dev/null || ! unshare -r true 2>/dev/null; then
-        skip "unprivileged user namespaces are unavailable; refusing to run the privileged recipes for real"
     fi
 
     TEST_ROOT="${BATS_TEST_TMPDIR:-${BATS_TMPDIR}}/justfile-build-bib.${BATS_TEST_NUMBER:-0}.$$"
@@ -91,8 +90,8 @@ esac
 exit 0
 EOF
 
-    # `sudoif` runs its argument vector directly as uid 0, but `_build-bib`
-    # also calls `sudo` by name for the build, the move and the chown.
+    # Both `sudoif` and `_build-bib`'s direct `sudo` calls resolve `sudo` on
+    # PATH, so this records the escalated argv and runs it unprivileged.
     cat >"${STUB_BIN}/sudo" <<'EOF'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"${SUDO_LOG}"
@@ -107,10 +106,11 @@ teardown() {
     rm -rf "${TEST_ROOT}"
 }
 
-# Runs a recipe in the sandbox inside a user namespace, so `sudoif` takes its
-# uid-0 branch and every privileged command lands on the stubs.
+# Runs a recipe in the sandbox as the calling user. SUDO_USER selects
+# `_rootful_load_image`'s already-escalated short circuit, and SSH_ASKPASS is
+# cleared so `sudoif` calls the stub `sudo` without `--askpass`.
 run_just() {
-    run unshare -r bash -c "cd '${SANDBOX}' && just \"\$@\"" _ "$@"
+    run env -u SSH_ASKPASS SUDO_USER=bats bash -c "cd '${SANDBOX}' && just \"\$@\"" _ "$@"
 }
 
 # The single recorded BIB `podman run` argv line (not the image-info read).
@@ -303,7 +303,7 @@ bib_run_args() {
     # where USER was never exported. Reading it would abort after a 15-25
     # minute build, with the disk already written. The Justfile grep in
     # justfile-build_test.bats states the rule; this runs it.
-    run unshare -r env -u USER bash -c "cd '${SANDBOX}' && just build-qcow2"
+    run env -u USER -u SSH_ASKPASS SUDO_USER=bats bash -c "cd '${SANDBOX}' && just build-qcow2"
     [ "$status" -eq 0 ]
     [ -f "${SANDBOX}/output/qcow2/disk.qcow2" ]
 }

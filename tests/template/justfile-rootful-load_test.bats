@@ -9,8 +9,8 @@
 # Getting that wrong builds a disk from a stale root-side image or from the
 # published one instead of the image the developer just built.
 #
-# justfile-build-bib_test.bats runs inside a uid-0 user namespace, where this
-# recipe exits on its first line, so none of those decisions ran. These cases
+# justfile-build-bib_test.bats sets SUDO_USER, so this recipe exits on its
+# first line there and none of those decisions run. These cases
 # run as an ordinary user with stub `podman` and `sudo` binaries on PATH: the
 # `sudo` stub records its argv and re-execs the command with STUB_AS_ROOT=1, and
 # the `podman` stub answers `images -q` differently for the user and root
