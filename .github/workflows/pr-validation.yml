@@ -15,11 +15,10 @@ permissions: {}
 
 jobs:
   validate:
-    # Pinned to 24.04: projectbluefin/actions' validate-pr installs
-    # shellcheck=0.9.0-1, which only exists on noble (see build-image.yml
-    # for the same reason). Revisit once the actions pin includes
-    # projectbluefin/actions#743.
-    runs-on: ubuntu-24.04
+    # ubuntu-latest resolves to 26.04 now; bootc-build/validate-pr pins
+    # shellcheck per Ubuntu release (projectbluefin/actions#745), so both the
+    # 24.04 and 26.04 runners are supported and the old stopgap is gone.
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       # The promotion check below reads refs and commits through the API.
