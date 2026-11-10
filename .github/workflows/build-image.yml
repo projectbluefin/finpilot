@@ -252,14 +252,6 @@ jobs:
             -o "spdx-json=sbom-current/${IMAGE_NAME}.sbom.json"
           echo "SBOM: $(wc -c < "sbom-current/${IMAGE_NAME}.sbom.json") bytes"
 
-      - name: Upload SBOM artifact
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: sbom-finpilot
-          path: sbom-current/${{ env.IMAGE_NAME }}.sbom.json
-          if-no-files-found: error
-          retention-days: 7
-
       - name: Push to GHCR
         id: push
         uses: projectbluefin/actions/bootc-build/push-image@41992083f437357010da2ea072ef353d982ae369 # v1
@@ -268,6 +260,27 @@ jobs:
           tags: ${{ steps.branch-tags.outputs.tags }}
           default-tag: ${{ steps.branch-tags.outputs.default-tag }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Bind the SBOM to the exact digest pushed above. The release downloads
+      # this artifact and must attach the inventory to the promoted image, not
+      # the newest build (finpilot #681 review): record the pushed digest inside
+      # the artifact so the release can reject any run whose SBOM describes a
+      # different image, then upload the whole sbom-current/ directory.
+      - name: Record SBOM image digest
+        env:
+          IMAGE_DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          set -euo pipefail
+          [[ "${IMAGE_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]
+          printf '%s\n' "${IMAGE_DIGEST}" > sbom-current/image-digest
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sbom-finpilot
+          path: sbom-current/
+          if-no-files-found: error
+          retention-days: 7
 
       # Sign and attest (SLSA Build L2 provenance)
       # Bluefin pattern: keyless OIDC signing via Fulcio.

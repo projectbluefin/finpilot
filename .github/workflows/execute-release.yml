@@ -102,12 +102,15 @@ jobs:
       id-token: write
       packages: read
     # Finpilot's build uploads the SBOM as an artifact from the already-built
-    # local image (see build-image.yml). The release downloads that artifact
-    # instead of scanning the promoted image inline, so the runner never pulls
-    # and unpacks the ~3 GB image a second time and the SBOM is produced
-    # instead of being killed (finpilot #678). The SBOM therefore describes the
-    # exact digest main built and this release promotes, with no rebuild.
-    uses: projectbluefin/actions/.github/workflows/reusable-release.yml@41992083f437357010da2ea072ef353d982ae369 # v1
+    # local image (see build-image.yml), bound to the pushed digest. The release
+    # downloads that artifact instead of scanning the promoted image inline, so
+    # the runner never pulls and unpacks the ~3 GB image a second time and the
+    # SBOM is produced instead of being killed (finpilot #678). The pinned
+    # reusable selects the newest successful build and would attach a newer
+    # build's SBOM to an older promoted image, so finpilot uses a local copy
+    # (release-from-build.yml) that binds the download to the exact promoted
+    # digest below, with no rebuild.
+    uses: ./.github/workflows/release-from-build.yml
     with:
       stream_name: stable
       image: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}
@@ -117,6 +120,10 @@ jobs:
       build_workflow: build-image.yml
       build_branch: main
       sbom_artifact: sbom-finpilot
+      # Require the SBOM artifact to describe this exact promoted digest, so a
+      # build that finished after the promotion cannot have its inventory
+      # attached to the released image (finpilot #681 review).
+      build_digest: ${{ fromJSON(needs.execute.outputs.promoted_digests)[github.event.repository.name] }}
       cert_identity_regexp: >-
         ^https://github\.com/${{ github.repository }}/\.github/workflows/
       docs_url: ${{ github.server_url }}/${{ github.repository }}/releases
