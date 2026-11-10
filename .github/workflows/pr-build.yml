@@ -1,0 +1,119 @@
+---
+name: PR Image Build
+
+# Build the image on pull requests that change what goes into it, so a broken
+# build fails before it merges instead of on the next push to main (#672; the
+# break fixed by #671 reached main this way).
+#
+# Read-only: it never pushes or signs, uses a read-only token and no secrets,
+# so it is safe on fork pull requests. The job always runs and finishes in
+# seconds when no build input changed, so it can be made a required check
+# without a paths filter on the trigger (a filtered-out required check would
+# block merges instead of skipping).
+on:
+  pull_request:
+    branches:
+      - main
+  merge_group:
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_NAME: "${{ github.event.repository.name }}"
+  IMAGE_VENDOR: "${{ github.repository_owner }}"
+  # Local tag only; nothing is pushed.
+  DEFAULT_TAG: "ci"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: PR image build
+    # Pinned to 24.04: projectbluefin/actions' setup-runner hard-asserts
+    # `ubuntu-24.04` when adding its resolute apt source (see build-image.yml).
+    runs-on: ubuntu-24.04
+    # One build with a cold cache fits well inside this; main's cached build
+    # takes about 25 minutes.
+    timeout-minutes: 150
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Build inputs: the Containerfile, the Justfile that drives the build,
+      # the build/ and custom/ trees the Containerfile copies, .dockerignore
+      # (it shapes the build context), and this workflow itself.
+      - name: Decide whether to build
+        id: decide
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          MERGE_GROUP_BASE: ${{ github.event.merge_group.base_sha }}
+        run: |
+          set -euo pipefail
+          if [[ "${EVENT_NAME}" == "merge_group" ]]; then
+            base="${MERGE_GROUP_BASE}"
+          else
+            # A pull_request run checks out GitHub's merge commit; its first
+            # parent is the base it was merged onto, so this diff is exactly
+            # the pull request's own change.
+            base="$(git rev-parse HEAD^1)"
+          fi
+          build=0
+          while IFS= read -r f; do
+            case "${f}" in
+              Containerfile | Justfile | .dockerignore | build/* | custom/* | .github/workflows/pr-build.yml)
+                echo "Build input changed: ${f}"
+                build=1
+                ;;
+            esac
+          done < <(git diff --name-only "${base}" HEAD)
+          echo "build=${build}" >> "${GITHUB_OUTPUT}"
+          if [[ "${build}" == "0" ]]; then
+            echo "No build inputs changed; skipping the image build." | tee -a "${GITHUB_STEP_SUMMARY}"
+          fi
+
+      - name: Prepare environment
+        if: steps.decide.outputs.build == '1'
+        run: |
+          echo "IMAGE_NAME=${IMAGE_NAME,,}" >> "${GITHUB_ENV}"
+          echo "IMAGE_VENDOR=${IMAGE_VENDOR,,}" >> "${GITHUB_ENV}"
+
+      - name: Setup runner
+        if: steps.decide.outputs.build == '1'
+        uses: projectbluefin/actions/bootc-build/setup-runner@41992083f437357010da2ea072ef353d982ae369 # v1
+        with:
+          storage-backend: btrfs
+          native-overlay: "true"
+          update-podman: "true"
+          install-tools: '["just"]'
+
+      - name: Restore DNF cache
+        if: steps.decide.outputs.build == '1'
+        uses: projectbluefin/actions/bootc-build/dnf-cache@41992083f437357010da2ea072ef353d982ae369 # v1
+        with:
+          action: restore
+          cache-name: ${{ env.IMAGE_NAME }}
+          cache-bust: ${{ hashFiles('**/Containerfile') }}
+
+      # A single attempt: a real break should report red after one build, not
+      # three. Re-run the job by hand for a suspected flake.
+      - name: Build image
+        if: steps.decide.outputs.build == '1'
+        timeout-minutes: 120
+        run: |
+          sudo -E "$(command -v just)" build "${IMAGE_NAME}" "${DEFAULT_TAG}"
+
+      - name: Report built image
+        if: steps.decide.outputs.build == '1'
+        run: |
+          sudo podman image exists "localhost/${IMAGE_NAME}:${DEFAULT_TAG}"
+          echo "Built localhost/${IMAGE_NAME}:${DEFAULT_TAG} (not pushed)." | tee -a "${GITHUB_STEP_SUMMARY}"
