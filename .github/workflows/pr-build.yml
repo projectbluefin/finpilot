@@ -1,0 +1,127 @@
+name: PR Image Build
+
+# Build the image on pull requests so a change to the build scripts fails
+# before it merges instead of only failing on the next push to main (issue
+# #672; the broken main build from #671 got in this way).
+#
+# This is a read-only PR build: it never pushes or signs, uses a read-only
+# token and no secrets, so it is safe to run on fork pull requests. It is not
+# required by default — a maintainer can add it as a required check in branch
+# protection once it has run green (that is a person's step, out of scope here).
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+env:
+  # IMAGE_VENDOR defaults to the repository owner when the Containerfile does
+  # not override it; lowercased so it is a valid registry path.
+  IMAGE_NAME: "${{ github.event.repository.name }}"
+  IMAGE_VENDOR: "${{ github.repository_owner }}"
+  # Local tag for the PR build; it is never pushed anywhere.
+  DEFAULT_TAG: "ci"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build image
+    # Always run so this can become a required check without a paths filter on
+    # the trigger (a filtered-out required check would itself block merges).
+    # The first step decides, in seconds, whether the PR touches any build
+    # input; if not, the job reports success and stops.
+    if: always()
+    # Pinned to 24.04: projectbluefin/actions' setup-runner hard-asserts
+    # `ubuntu-24.04` when adding its resolute apt source, so a 26.04 runner
+    # fails that step (see build-image.yml for the same reason).
+    runs-on: ubuntu-24.04
+    # main's build takes about 25 minutes with cache; leave headroom for a cold
+    # cache and the build step's three retries (120 min each), matching
+    # build-image.yml.
+    timeout-minutes: 360
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Prepare environment
+        run: |
+          echo "IMAGE_NAME=${IMAGE_NAME,,}" >> "${GITHUB_ENV}"
+          echo "IMAGE_VENDOR=${IMAGE_VENDOR,,}" >> "${GITHUB_ENV}"
+
+      # The image build reads the Containerfile, Justfile, build/ and
+      # system_files/ inputs. If a PR changes none of them the image cannot
+      # change, so report success in seconds instead of building.
+      # github.event.pull_request.changed_files is this PR's own file list, so
+      # no extra git fetch is needed.
+      - name: Decide whether to build
+        id: decide
+        shell: bash
+        run: |
+          mapfile -t changed < <(echo "${{ github.event.pull_request.changed_files }}" | jq -r '.[]')
+          build=0
+          for f in "${changed[@]}"; do
+            case "${f}" in
+              Containerfile|Justfile|build/*|system_files/*)
+                echo "Build input changed: ${f}"
+                build=1
+                ;;
+            esac
+          done
+          echo "build=${build}" >> "${GITHUB_OUTPUT}"
+          if [ "${build}" = "0" ]; then
+            echo "No build inputs changed; skipping image build."
+          fi
+
+      - name: Setup runner
+        if: steps.decide.outputs.build == '1'
+        uses: projectbluefin/actions/bootc-build/setup-runner@6453818f6279a2f2c1282919aad0009a88c01819 # v1
+        with:
+          storage-backend: btrfs
+          native-overlay: "true"
+          update-podman: "true"
+          install-tools: '["just"]'
+
+      - name: Restore DNF cache
+        if: steps.decide.outputs.build == '1'
+        id: dnf-cache-restore
+        uses: projectbluefin/actions/bootc-build/dnf-cache@6453818f6279a2f2c1282919aad0009a88c01819 # v1
+        with:
+          action: restore
+          cache-name: ${{ env.IMAGE_NAME }}
+          cache-bust: ${{ hashFiles('**/Containerfile') }}
+
+      - name: Build image
+        if: steps.decide.outputs.build == '1'
+        id: build-image
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4
+        env:
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          IMAGE_VENDOR: ${{ env.IMAGE_VENDOR }}
+          DEFAULT_TAG: ${{ env.DEFAULT_TAG }}
+        with:
+          timeout_minutes: 120
+          max_attempts: 3
+          retry_wait_seconds: 300
+          command: |
+            sudo -E "$(command -v just)" build "${IMAGE_NAME}" "${DEFAULT_TAG}"
+
+      - name: Report built image
+        if: steps.decide.outputs.build == '1'
+        shell: bash
+        env:
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          DEFAULT_TAG: ${{ env.DEFAULT_TAG }}
+        run: |
+          # Read-only: inspect the locally built image and report its version.
+          # No push, no signing, no registry write.
+          sudo podman inspect "localhost/${IMAGE_NAME}:${DEFAULT_TAG}" \
+            --format 'Built ${IMAGE_NAME}:${DEFAULT_TAG}' || true
+          echo "Image built successfully for this pull request." >> "${GITHUB_STEP_SUMMARY}"
