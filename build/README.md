@@ -52,4 +52,7 @@ dnf5 install -y package-name
 - Scripts run as root, with the build context at `/ctx`.
 - Use `dnf5`, never `dnf` or `yum`, and always `-y`.
 - Disable any repository you enable. `copr_install_isolated` does it for COPRs.
+  As a backstop, `90-cleanup.sh` disables every `/etc/yum.repos.d/*.repo` that
+  no installed RPM owns, and fails the build if one stays enabled. There is no
+  opt-out: a vendor repository cannot stay enabled in the shipped image.
 - Keep one purpose per script, and name it for that purpose.

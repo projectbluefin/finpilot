@@ -261,9 +261,29 @@ EOF
 }
 
 @test "90-cleanup: guard passes when dnf reports only Fedora repositories" {
-	# Fedora's own repositories (fedora, fedora-updates, fedora-cisco-openh264)
-	# are the only ones the build may ship enabled.
-	DNF5_REPO_LIST="fedora fedora-updates fedora-cisco-openh264" run_cleanup
+	# Fedora's own repositories (fedora, fedora-updates, fedora-cisco-openh264,
+	# and the fedora-repos-archive updates-archive pair) are the only ones the
+	# build may ship enabled. Each id is on its own row so the guard checks every
+	# one, not just the first column of a single row.
+	DNF5_REPO_LIST=$'fedora\nfedora-updates\nfedora-cisco-openh264\nfedora-updates-archive\nupdates-archive' run_cleanup
+	[ "$status" -eq 0 ]
+}
+
+@test "90-cleanup: allows Fedora's updates-archive while rejecting a third-party repository" {
+	# updates-archive ships with Fedora's own fedora-repos-archive package, so it
+	# is first-party and must be allowed. A genuinely third-party repository next
+	# to it must still fail the build, and updates-archive must not appear in the
+	# rejection.
+	DNF5_REPO_LIST=$'updates-archive\nrpmfusion-free' run_cleanup
+	[ "$status" -eq 1 ]
+	[[ "$output" == *"::error::third-party repository still enabled: rpmfusion-free"* ]]
+	[[ "$output" != *"updates-archive"* ]]
+}
+
+@test "90-cleanup: allows updates-archive on its own" {
+	# The build ships updates-archive enabled; the guard must treat it as
+	# first-party and pass.
+	DNF5_REPO_LIST="updates-archive" run_cleanup
 	[ "$status" -eq 0 ]
 }
 
