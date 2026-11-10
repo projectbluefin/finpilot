@@ -44,6 +44,21 @@ runs, so it attests the current candidate. The binding comes from
 refuse to promote at all once `main` has moved past the promotion commit; a
 manual dispatch is exempt, because that path is deliberate recovery.
 
+The release's SBOM is generated at build time, not scanned on the release run.
+`build-image.yml` installs Syft and catalogs the already-built local image
+(`podman:localhost/${IMAGE_NAME}:${DEFAULT_TAG}`) with `rpm-db-cataloger`,
+`--scope squashed`, `--parallelism 1`, and uploads it as the `sbom-finpilot`
+artifact. `execute-release.yml`'s release job passes `build_workflow:
+build-image.yml`, `build_branch: main`, and `sbom_artifact: sbom-finpilot` so it
+downloads that artifact instead of scanning the promoted image inline. Scanning
+inline pulls and unpacks the ~3 GB image on a bare ubuntu-24.04 runner, where the
+runner is evicted before the scan finishes (finpilot #678) and the release ships
+an empty package list. The build-time catalog reads the layers from the btrfs
+podman storage this build already used, so there is no second pull and the SBOM
+describes the exact digest that is pushed. The release still ships an empty SBOM
+if the artifact is missing, so a build-time scan failure must stay loud, not be
+hidden with continue-on-error.
+
 The same reusable builds the squash branch, and it stages deletions with
 `git diff --diff-filter=D`. Git reports a moved file as a rename, so a path `main`
 moved survives on its old path and the branch's tree stops matching `main`'s —
