@@ -15,7 +15,11 @@ permissions: {}
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    # Pinned to 24.04: projectbluefin/actions' validate-pr installs
+    # shellcheck=0.9.0-1, which only exists on noble (see build-image.yml
+    # for the same reason). Revisit once the actions pin includes
+    # projectbluefin/actions#743.
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       # The promotion check below reads refs and commits through the API.
@@ -61,7 +65,7 @@ jobs:
           echo "Resolved shellcheck scope: ${glob}"
 
       - name: Validate
-        uses: projectbluefin/actions/bootc-build/validate-pr@6453818f6279a2f2c1282919aad0009a88c01819 # v1
+        uses: projectbluefin/actions/bootc-build/validate-pr@41992083f437357010da2ea072ef353d982ae369 # v1
         with:
           shellcheck-glob: ${{ steps.shell-scope.outputs.glob }}
           dockerfile: "Containerfile"
