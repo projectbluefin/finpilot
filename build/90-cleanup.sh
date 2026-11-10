@@ -45,39 +45,57 @@ done
 # addrepo, or nvidia-container-toolkit.repo from a curl) has no fixed name in
 # this list, so classify by ownership too: base Fedora repo files are owned by
 # fedora-repos*, while anything dnf5, config-manager or a script writes is
-# owned by nothing and is therefore third-party. De-duplicate below, since the
-# ownership pass can name a file the fixed list already covers.
-for repo_file in "${REPOS_DIR}"/*.repo; do
-	[[ -f "${repo_file}" ]] || continue
-	rpm -qf "${repo_file}" >/dev/null 2>&1 && continue
-	third_party_repo_files+=("${repo_file}")
-done
+# owned by nothing and is therefore third-party.
+#
+# rpm is always present in a bootc Fedora image, but guard the pass so a
+# missing rpm can never make every base file look unowned and disable the base
+# repositories. De-duplicate below, since the ownership pass can name a file
+# the fixed list already covers.
+if command -v rpm >/dev/null 2>&1; then
+	for repo_file in "${REPOS_DIR}"/*.repo; do
+		[[ -f "${repo_file}" ]] || continue
+		rpm -qf "${repo_file}" >/dev/null 2>&1 && continue
+		third_party_repo_files+=("${repo_file}")
+	done
+fi
 
 # The fixed globs and the ownership pass can name the same file twice, so
 # de-duplicate before both loops see the list.
-if command -v rpm >/dev/null 2>&1; then
-	declare -A third_party_seen=()
-	third_party_unique=()
-	for repo_file in "${third_party_repo_files[@]}"; do
-		[[ -n "${third_party_seen["${repo_file}"]:-}" ]] && continue
-		third_party_seen["${repo_file}"]=1
-		third_party_unique+=("${repo_file}")
-	done
-	third_party_repo_files=("${third_party_unique[@]}")
-fi
+declare -A third_party_seen=()
+third_party_unique=()
+for repo_file in "${third_party_repo_files[@]}"; do
+	[[ -n "${third_party_seen["${repo_file}"]:-}" ]] && continue
+	third_party_seen["${repo_file}"]=1
+	third_party_unique+=("${repo_file}")
+done
+third_party_repo_files=("${third_party_unique[@]}")
 
 for repo_file in "${third_party_repo_files[@]}"; do
 	disable_repo_file "${repo_file}"
 done
 
 # Fail loudly rather than shipping a third-party repository that is still live.
-for repo_file in "${third_party_repo_files[@]}"; do
-	[[ -f "${repo_file}" ]] || continue
-	if grep -qiE '^[[:space:]]*enabled[[:space:]]*=[[:space:]]*(1|true|yes|on)[[:space:]]*$' "${repo_file}"; then
-		echo "::error::third-party repository still enabled: $(basename "${repo_file}")" >&2
-		exit 1
-	fi
-done
+# Ask dnf which repositories are actually enabled, rather than pattern-matching
+# the .repo files: a repository that ships with no enabled= key is enabled by
+# dnf's default and slips past both the rewrite above and a grep of the file.
+# The allowlist is an exact set of Fedora's own repository ids; anything else
+# dnf reports as live, including Fedora-like names such as fedora-multimedia,
+# leaked through the disable pass and fails the build.
+if ! repo_list="$(dnf5 -q repo list --enabled)"; then
+	echo "::error::could not query enabled repositories with dnf5" >&2
+	exit 1
+fi
+live="$(printf '%s\n' "${repo_list}" | awk '
+	BEGIN { split("fedora updates fedora-updates fedora-cisco-openh264", ok, " "); for (i in ok) allowed[ok[i]] = 1 }
+	NF == 0 { next }
+	$1 == "repo" && $2 == "id" { next }
+	$1 == "Id" || $1 == "Id:" { next }
+	!($1 in allowed) { print $1 }
+')"
+if [ -n "${live}" ]; then
+	echo "::error::third-party repository still enabled: ${live}" >&2
+	exit 1
+fi
 
 echo "::endgroup::"
 
