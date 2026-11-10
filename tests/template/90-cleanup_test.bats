@@ -215,6 +215,45 @@ run_cleanup() {
 	grep -q '^enabled=0' "${REPOS_DIR}/vscode.repo"
 }
 
+@test "90-cleanup: leaves base repositories enabled when rpm is absent" {
+	# The ownership pass is the only place the script uses rpm to classify a
+	# repo file. With no rpm on PATH it must be skipped entirely, so a base repo
+	# the fixed list does not name (fedora.repo) stays enabled instead of being
+	# treated as third-party by a failing "rpm -qf".
+	no_rpm_bin="${TEST_ROOT}/no-rpm-bin"
+	mkdir -p "${no_rpm_bin}"
+
+	# Run the script with a PATH that has no rpm at all, but still has the real
+	# tools it needs so the disable pass and the guard behave normally.
+	for tool in bash rm find mkdir rmdir basename grep sed; do
+		ln -s "$(command -v "${tool}")" "${no_rpm_bin}/${tool}"
+	done
+
+	cat >"${no_rpm_bin}/dnf5" <<'EOF'
+#!/usr/bin/bash
+exit 0
+EOF
+	chmod +x "${no_rpm_bin}/dnf5"
+	cat >"${no_rpm_bin}/systemctl" <<'EOF'
+#!/usr/bin/bash
+exit 0
+EOF
+	chmod +x "${no_rpm_bin}/systemctl"
+	cat >"${no_rpm_bin}/mountpoint" <<'EOF'
+#!/usr/bin/bash
+exit 1
+EOF
+	chmod +x "${no_rpm_bin}/mountpoint"
+
+	saved_path="${PATH}"
+	export PATH="${no_rpm_bin}"
+	run bash "${CLEANUP_SRC}"
+	export PATH="${saved_path}"
+
+	[ "$status" -eq 0 ]
+	grep -q '^enabled=1' "${REPOS_DIR}/fedora.repo"
+}
+
 @test "90-cleanup: guard fails the build when an unowned third-party repository is still enabled" {
 	# An unowned repository the build added is caught by the guard even when
 	# sed is a no-op, so a rewrite that changes nothing still fails the build.
