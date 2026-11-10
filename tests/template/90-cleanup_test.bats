@@ -223,7 +223,7 @@ run_cleanup() {
 
 	# Run the script with a PATH that has no rpm at all, but still has the real
 	# tools it needs so the disable pass and the guard behave normally.
-	for tool in bash rm find mkdir rmdir basename grep sed; do
+	for tool in bash rm find mkdir rmdir basename grep sed awk; do
 		ln -s "$(command -v "${tool}")" "${no_rpm_bin}/${tool}"
 	done
 
