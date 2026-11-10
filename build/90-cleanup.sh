@@ -78,15 +78,17 @@ done
 # Ask dnf which repositories are actually enabled, rather than pattern-matching
 # the .repo files: a repository that ships with no enabled= key is enabled by
 # dnf's default and slips past both the rewrite above and a grep of the file.
-# The allowlist is an exact set of Fedora's own repository ids; anything else
-# dnf reports as live, including Fedora-like names such as fedora-multimedia,
-# leaked through the disable pass and fails the build.
+# The allowlist is Fedora's own repository ids, including the updates-archive
+# repositories shipped by fedora-repos-archive: those are first-party and stay
+# enabled (the ownership pass does not disable rpm-owned files), while anything
+# else dnf reports as live - including Fedora-like names such as fedora-multimedia
+# that leaked through the disable pass - fails the build.
 if ! repo_list="$(dnf5 -q repo list --enabled)"; then
 	echo "::error::could not query enabled repositories with dnf5" >&2
 	exit 1
 fi
 live="$(printf '%s\n' "${repo_list}" | awk '
-	BEGIN { split("fedora updates fedora-updates fedora-cisco-openh264", ok, " "); for (i in ok) allowed[ok[i]] = 1 }
+	BEGIN { split("fedora updates fedora-updates fedora-cisco-openh264 fedora-updates-archive updates-archive", ok, " "); for (i in ok) allowed[ok[i]] = 1 }
 	NF == 0 { next }
 	$1 == "repo" && $2 == "id" { next }
 	$1 == "Id" || $1 == "Id:" { next }

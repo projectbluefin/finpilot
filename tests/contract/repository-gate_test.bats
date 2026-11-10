@@ -33,7 +33,7 @@ setup() {
 }
 
 @test "the gate allowlists only exact Fedora repository ids" {
-	grep -qF 'split("fedora updates fedora-updates fedora-cisco-openh264"' "${CLEANUP_SRC}"
+	grep -qF 'split("fedora updates fedora-updates fedora-cisco-openh264 fedora-updates-archive updates-archive"' "${CLEANUP_SRC}"
 	! grep -qF "grep -vE '^(fedora|updates)'" "${CLEANUP_SRC}"
 }
 
