@@ -16,6 +16,7 @@ description: >-
 | `promote-main-to-stable.yml` | daily schedule, dispatch | Opens the squash promotion PR and runs the release gate on it. |
 | `sync-stable-to-main.yml` | push to `stable` | Merges `stable` hotfixes back into `main`. |
 | `pr-validation.yml` | pull request | The `validate` check: shellcheck and hadolint. |
+| `pr-build.yml` | pull request, merge queue | The `PR image build` check: builds the image (no push, no signing) when the Containerfile, Justfile, `.dockerignore`, `build/`, `custom/` or the workflow itself changes; passes in seconds otherwise. |
 | `validate-brewfiles.yml` | pull request | Brewfiles, without evaluating them. |
 | `validate-flatpaks.yml` | pull request | Flatpak preinstall files against Flathub. |
 | `validate-justfiles.yml` | pull request | `just check`. |
@@ -96,8 +97,9 @@ secrets context — `secrets` in a job-level `if` is a parse error, not a skip.
 
 Automerge deliberately covers GitHub Actions SHA bumps, which reverses a guard
 upstream kept. Those SHAs run in jobs holding `packages: write`,
-`id-token: write`, and `secrets: inherit`, and PR builds are disabled, so a bump
-merges with only shellcheck, hadolint, and the test suite having run. Putting the
+`id-token: write`, and `secrets: inherit`, and the PR image build runs only when
+the image's inputs change, which an action bump does not, so a bump merges with
+only shellcheck, hadolint, and the test suite having run. Putting the
 guard back is one rule — `matchManagers: ["github-actions"]` with
 `automerge: false`.
 
