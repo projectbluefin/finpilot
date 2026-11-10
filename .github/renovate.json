@@ -56,7 +56,7 @@
       "matchManagers": ["github-actions"],
       "matchPackageNames": ["!projectbluefin/**", "!Homebrew/actions"],
       "automerge": true,
-      "minimumReleaseAge": 3
+      "minimumReleaseAge": "3 days"
     },
     {
       "description": "Homebrew/actions tracks an unversioned moving branch and is digest-pinned to its main, so every bump imports whatever that branch currently holds. Keep it waiting for a human until it is moved to dated releases, per the #645 decision, and leave its pin and automerge block exactly as they were. This rule sits after the digest rule above so it wins for Homebrew/actions.",
