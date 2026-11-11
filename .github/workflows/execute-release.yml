@@ -120,10 +120,6 @@ jobs:
       build_workflow: build-image.yml
       build_branch: main
       sbom_artifact: sbom-finpilot
-      # Require the SBOM artifact to describe this exact promoted digest, so a
-      # build that finished after the promotion cannot have its inventory
-      # attached to the released image (finpilot #681 review).
-      build_digest: ${{ fromJSON(needs.execute.outputs.promoted_digests)[github.event.repository.name] }}
       cert_identity_regexp: >-
         ^https://github\.com/${{ github.repository }}/\.github/workflows/
       docs_url: ${{ github.server_url }}/${{ github.repository }}/releases

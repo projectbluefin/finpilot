@@ -73,6 +73,18 @@ EOF
 	chmod +x "${dir}/gh"
 }
 
+# Build a stub `skopeo` that reports the promoted digest for any
+# `skopeo inspect` call, driven by STUB_PROMOTED_DIGEST. The selection script
+# resolves the promoted digest this way (skopeo inspect docker://IMAGE:STREAM).
+make_skopeo_stub() {
+	local dir="$1"
+	cat >"${dir}/skopeo" <<'EOF'
+#!/bin/bash
+printf '%s\n' "${STUB_PROMOTED_DIGEST}"
+EOF
+	chmod +x "${dir}/skopeo"
+}
+
 A_DIGEST="sha256:$(printf 'a%.0s' {1..64})"
 B_DIGEST="sha256:$(printf 'b%.0s' {1..64})"
 
@@ -87,15 +99,23 @@ setup() {
 	grep -q 'image-digest' "${WORKFLOW}"
 	grep -q 'EXPECTED_DIGEST' "${WORKFLOW}"
 	! grep -q 'gh run list.*--limit 1' "${WORKFLOW}"
+	# The promoted digest is resolved in-workflow via skopeo on :stable, so the
+	# release does not depend on an output the execute job never forwards.
+	grep -q 'skopeo inspect' "${WORKFLOW}"
+	! grep -q 'promoted_digests' "${WORKFLOW}"
+	! grep -q 'build_digest' "${WORKFLOW}"
+	! grep -q 'needs.execute.outputs' "${WORKFLOW}"
 }
 
 @test "with B newest and A promoted, the loop still selects A" {
 	local bin; bin="$(mktemp -d)"
 	make_gh_stub "${bin}" "${A_DIGEST}" "${B_DIGEST}" "ok"
+	make_skopeo_stub "${bin}"
 
 	local gh_output; gh_output="$(mktemp)"
 	local run_id
-	run_id="$(env STUB_A_DIGEST="${A_DIGEST}" STUB_B_DIGEST="${B_DIGEST}" STUB_BEHAVIOR="ok" PATH="${bin}:${PATH}" GH_TOKEN=test GITHUB_OUTPUT="${gh_output}" BUILD_WORKFLOW=build-image.yml BUILD_BRANCH=main REPOSITORY=projectbluefin/finpilot EXPECTED_DIGEST="${A_DIGEST}" SBOM_ARTIFACT=sbom-finpilot bash "${SCRIPT}" 2>/dev/null)"
+	# skopeo reports the promoted digest (A); gh lists B newest first, then A.
+	run_id="$(env STUB_PROMOTED_DIGEST="${A_DIGEST}" STUB_A_DIGEST="${A_DIGEST}" STUB_B_DIGEST="${B_DIGEST}" STUB_BEHAVIOR="ok" PATH="${bin}:${PATH}" GH_TOKEN=test GITHUB_OUTPUT="${gh_output}" BUILD_WORKFLOW=build-image.yml BUILD_BRANCH=main REPOSITORY=projectbluefin/finpilot IMAGE=ghcr.io/projectbluefin/finpilot STREAM_NAME=stable SBOM_ARTIFACT=sbom-finpilot bash "${SCRIPT}" 2>/dev/null)"
 	run_id="$(sed -n 's/^run_id=//p' "${gh_output}")"
 
 	[ "${run_id}" = "100" ]
@@ -104,10 +124,13 @@ setup() {
 @test "the release fails before publication when no run carries the promoted digest" {
 	local bin; bin="$(mktemp -d)"
 	make_gh_stub "${bin}" "${A_DIGEST}" "${B_DIGEST}" "a-missing"
+	make_skopeo_stub "${bin}"
 
 	local gh_output; gh_output="$(mktemp)"
 	local out; local status=0
-	if out="$(env STUB_A_DIGEST="${A_DIGEST}" STUB_B_DIGEST="${B_DIGEST}" STUB_BEHAVIOR="a-missing" PATH="${bin}:${PATH}" GH_TOKEN=test GITHUB_OUTPUT="${gh_output}" BUILD_WORKFLOW=build-image.yml BUILD_BRANCH=main REPOSITORY=projectbluefin/finpilot EXPECTED_DIGEST="${A_DIGEST}" SBOM_ARTIFACT=sbom-finpilot bash "${SCRIPT}" 2>&1)"; then
+	# skopeo reports the promoted digest (A), but no run's artifact can be
+	# downloaded, so the loop must fail loudly before publication.
+	if out="$(env STUB_PROMOTED_DIGEST="${A_DIGEST}" STUB_A_DIGEST="${A_DIGEST}" STUB_B_DIGEST="${B_DIGEST}" STUB_BEHAVIOR="a-missing" PATH="${bin}:${PATH}" GH_TOKEN=test GITHUB_OUTPUT="${gh_output}" BUILD_WORKFLOW=build-image.yml BUILD_BRANCH=main REPOSITORY=projectbluefin/finpilot IMAGE=ghcr.io/projectbluefin/finpilot STREAM_NAME=stable SBOM_ARTIFACT=sbom-finpilot bash "${SCRIPT}" 2>&1)"; then
 		status=0
 	else
 		status=$?

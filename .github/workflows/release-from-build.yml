@@ -5,9 +5,11 @@ name: Reusable Release
 # three ways, all to bind the SBOM to the exact promoted image (finpilot #681):
 #   * the $/ self-repo action references below are expanded to the pinned
 #     projectbluefin/actions SHA, because this file owns no bootc-build actions;
-#   * the build run is selected by the promoted digest (build_digest input), not
-#     by the newest successful build, so a later build cannot have its SBOM
-#     attached to an older released image;
+#   * the build run is selected by the promoted digest, resolved here via
+#     `skopeo inspect` on :stable (which equals the build's pushed digest, since
+#     build-image.yml is the sole builder of :testing and the promote copies it
+#     by digest), not by the newest successful build, so a later build cannot
+#     have its SBOM attached to an older released image;
 #   * a missing or unbound SBOM fails the run instead of falling back to an
 #     empty inventory.
 # Supports three modes:
@@ -40,10 +42,6 @@ on:
         description: "SBOM artifact name to download from the build run"
         default: sbom-bluefin
         required: false
-        type: string
-      build_digest:
-        description: Exact promoted image digest required in the build artifact
-        required: true
         type: string
       image:
         description: "Full GHCR image URL without tag (e.g. ghcr.io/projectbluefin/bluefin)"
@@ -313,10 +311,22 @@ jobs:
           BUILD_WORKFLOW: ${{ inputs.build_workflow }}
           BUILD_BRANCH: ${{ inputs.build_branch }}
           REPOSITORY: ${{ github.repository }}
-          EXPECTED_DIGEST: ${{ inputs.build_digest }}
           SBOM_ARTIFACT: ${{ inputs.sbom_artifact }}
+          IMAGE: ${{ needs.normalize-image.outputs.image }}
+          STREAM_NAME: ${{ inputs.stream_name }}
         run: |
           set -euo pipefail
+          # The promoted digest is what :stable points at; build-image.yml
+          # recorded the same digest in the SBOM artifact (it is the sole
+          # builder of :testing and the promote copies it by digest). Match the
+          # download on it so a build that finished after the promotion cannot
+          # have its inventory attached to this released image (finpilot #681).
+          EXPECTED_DIGEST="$(skopeo inspect --format '{{.Digest}}' \
+            "docker://${IMAGE}:${STREAM_NAME}" 2>/dev/null || echo '')"
+          if [[ -z "${EXPECTED_DIGEST}" ]]; then
+            echo "::error::Could not resolve promoted digest for ${IMAGE}:${STREAM_NAME} — refusing to release without a digest binding"
+            exit 1
+          fi
           [[ "${EXPECTED_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]
           runs=$(gh run list --repo "${REPOSITORY}" \
             --workflow "${BUILD_WORKFLOW}" --branch "${BUILD_BRANCH}" \
