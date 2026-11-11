@@ -73,10 +73,9 @@ jobs:
       # Merging by hand matters beyond the merge method. A merge performed as
       # github-actions creates no workflow runs — a push made with that token is
       # exempt only for workflow_dispatch and repository_dispatch — so the
-      # push-triggered execute-release.yml and sync-stable-to-main.yml never
-      # fire for it and the release becomes a manual dispatch. A merge performed
-      # by a person fires both, which is why this PR is merged in the UI rather
-      # than by a bot.
+      # push-triggered execute-release.yml never fires for it and the release
+      # becomes a manual dispatch. A merge performed by a person fires it, which
+      # is why this PR is merged in the UI rather than by a bot.
       enqueue_promotion: false
       # Personal-account forks do not have an <owner>/maintainers team.
       # Organization forks can enable this and optionally set `reviewer`.
