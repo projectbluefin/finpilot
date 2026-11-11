@@ -55,9 +55,11 @@ inline pulls and unpacks the ~3 GB image on a bare ubuntu-24.04 runner, where th
 runner is evicted before the scan finishes (finpilot #678) and the release ships
 an empty package list. The build-time catalog reads the layers from the btrfs
 podman storage this build already used, so there is no second pull and the SBOM
-describes the exact digest that is pushed. The release still ships an empty SBOM
-if the artifact is missing, so a build-time scan failure must stay loud, not be
-hidden with continue-on-error.
+describes the exact digest that is pushed. The artifact includes an image-digest
+file. The local release-from-build.yml consumer selects a successful build whose
+artifact matches the promoted digest and stops release publication if no match
+is retained or its download fails. There is no empty-SBOM fallback on this path;
+build-time scan failures must also remain fatal.
 
 The same reusable builds the squash branch, and it stages deletions with
 `git diff --diff-filter=D`. Git reports a moved file as a rename, so a path `main`
