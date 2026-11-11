@@ -265,7 +265,7 @@ jobs:
             --parallelism 1 \
             --override-default-catalogers rpm-db-cataloger \
             -o "spdx-json=sbom-current/${IMAGE_NAME}.sbom.json"
-          sudo podman image unmount "${MNT}"
+          sudo podman image unmount "localhost/${IMAGE_NAME}:${DEFAULT_TAG}"
           echo "SBOM: $(wc -c < "sbom-current/${IMAGE_NAME}.sbom.json") bytes"
 
       - name: Push to GHCR
