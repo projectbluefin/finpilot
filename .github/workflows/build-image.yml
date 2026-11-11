@@ -249,24 +249,15 @@ jobs:
           SYFT_CMD: ${{ steps.setup-syft.outputs.cmd }}
         run: |
           set -euo pipefail
+          # Create the directory as the runner user: the digest step below
+          # writes into it without sudo.
           mkdir -p sbom-current
-          # Syft's `podman:` source talks to the Podman API socket, not to
-          # Podman's storage. This build runs rootful with no rootful socket on
-          # the runner, so `sudo syft podman:…` fails with "no host address"
-          # (finpilot #683). Mount the built image and scan the directory
-          # instead: it reads the layers from storage directly, with no daemon
-          # and no second copy of the ~3 GB image. `--scope` does not apply to
-          # `dir:`, so it is dropped here, and --source-name/--source-version
-          # name the SBOM so the release card can identify the image.
-          MNT="$(sudo podman image mount "localhost/${IMAGE_NAME}:${DEFAULT_TAG}")"
-          sudo "${SYFT_CMD}" "dir:${MNT}" \
-            --source-name "${IMAGE_NAME}" \
-            --source-version "${DEFAULT_TAG}" \
-            --parallelism 1 \
-            --override-default-catalogers rpm-db-cataloger \
-            -o "spdx-json=sbom-current/${IMAGE_NAME}.sbom.json"
-          sudo podman image unmount "localhost/${IMAGE_NAME}:${DEFAULT_TAG}"
-          echo "SBOM: $(wc -c < "sbom-current/${IMAGE_NAME}.sbom.json") bytes"
+          # The scan lives in the Justfile's `sbom` recipe, so the PR image
+          # build runs the exact same command (#686). It mounts the image and
+          # scans it as a directory, because syft's `podman:` source needs a
+          # Podman API socket this rootful build does not have (#683).
+          SYFT="${SYFT_CMD}" sudo -E "$(command -v just)" sbom \
+            "${IMAGE_NAME}" "${DEFAULT_TAG}" sbom-current
 
       - name: Push to GHCR
         id: push
