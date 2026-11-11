@@ -44,10 +44,14 @@ refuse to promote at all once `main` has moved past the promotion commit; a
 manual dispatch is exempt, because that path is deliberate recovery.
 
 The release's SBOM is generated at build time, not scanned on the release run.
-`build-image.yml` installs Syft and catalogs the already-built local image
-(`podman:localhost/${IMAGE_NAME}:${DEFAULT_TAG}`) with `rpm-db-cataloger`,
-`--scope squashed`, `--parallelism 1`, and uploads it as the `sbom-finpilot`
-artifact. `execute-release.yml`'s release job passes `build_workflow:
+`build-image.yml` installs Syft and scans the already-built local image. Syft's
+`podman:` source talks to the Podman API socket, which this rootful build has no
+rootful instance of (finpilot #683), so the image is mounted read-only with
+`podman image mount` and scanned as a directory (`dir:`) instead. That reads the
+layers from the btrfs podman storage this build already used, with no daemon and
+no second copy of the ~3 GB image, and the SBOM still describes the exact digest
+that is pushed. It catalogs with `rpm-db-cataloger`, `--parallelism 1`, and
+uploads it as the `sbom-finpilot` artifact. `execute-release.yml`'s release job passes `build_workflow:
 build-image.yml`, `build_branch: main`, and `sbom_artifact: sbom-finpilot` so it
 downloads that artifact instead of scanning the promoted image inline. Scanning
 inline pulls and unpacks the ~3 GB image on a bare ubuntu-24.04 runner, where the

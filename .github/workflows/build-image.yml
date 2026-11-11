@@ -250,11 +250,22 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p sbom-current
-          sudo "${SYFT_CMD}" "podman:localhost/${IMAGE_NAME}:${DEFAULT_TAG}" \
-            --scope squashed \
+          # Syft's `podman:` source talks to the Podman API socket, not to
+          # Podman's storage. This build runs rootful with no rootful socket on
+          # the runner, so `sudo syft podman:…` fails with "no host address"
+          # (finpilot #683). Mount the built image and scan the directory
+          # instead: it reads the layers from storage directly, with no daemon
+          # and no second copy of the ~3 GB image. `--scope` does not apply to
+          # `dir:`, so it is dropped here, and --source-name/--source-version
+          # name the SBOM so the release card can identify the image.
+          MNT="$(sudo podman image mount "localhost/${IMAGE_NAME}:${DEFAULT_TAG}")"
+          sudo "${SYFT_CMD}" "dir:${MNT}" \
+            --source-name "${IMAGE_NAME}" \
+            --source-version "${DEFAULT_TAG}" \
             --parallelism 1 \
             --override-default-catalogers rpm-db-cataloger \
             -o "spdx-json=sbom-current/${IMAGE_NAME}.sbom.json"
+          sudo podman image unmount "localhost/${IMAGE_NAME}:${DEFAULT_TAG}"
           echo "SBOM: $(wc -c < "sbom-current/${IMAGE_NAME}.sbom.json") bytes"
 
       - name: Push to GHCR
