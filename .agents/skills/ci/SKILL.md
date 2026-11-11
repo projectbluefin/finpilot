@@ -14,7 +14,6 @@ description: >-
 | `build-image.yml` | push to `main` or `stable`, dispatch | Builds, signs, and pushes the image. |
 | `execute-release.yml` | push to `stable` | Promotes the candidate digest. Does not rebuild. |
 | `promote-main-to-stable.yml` | daily schedule, dispatch | Opens the squash promotion PR and runs the release gate on it. |
-| `sync-stable-to-main.yml` | push to `stable` | Merges `stable` hotfixes back into `main`. |
 | `pr-validation.yml` | pull request | The `validate` check: shellcheck and hadolint. |
 | `pr-build.yml` | pull request, merge queue | The `PR image build` check: builds the image (no push, no signing) when the Containerfile, Justfile, `.dockerignore`, `build/`, `custom/` or the workflow itself changes; passes in seconds otherwise. |
 | `validate-brewfiles.yml` | pull request | Brewfiles, without evaluating them. |
