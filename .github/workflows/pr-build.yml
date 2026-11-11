@@ -48,9 +48,10 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      # Build inputs: the Containerfile, the Justfile that drives the build,
-      # the build/ and custom/ trees the Containerfile copies, .dockerignore
-      # (it shapes the build context), and this workflow itself.
+      # Build inputs: the Containerfile, the Justfile that drives the build
+      # and the package scan, the build/ and custom/ trees the Containerfile
+      # copies, .dockerignore (it shapes the build context), this workflow
+      # itself, and build-image.yml (its package scan is checked here, #686).
       - name: Decide whether to build
         id: decide
         shell: bash
@@ -70,7 +71,7 @@ jobs:
           build=0
           while IFS= read -r f; do
             case "${f}" in
-              Containerfile | Justfile | .dockerignore | build/* | custom/* | .github/workflows/pr-build.yml)
+              Containerfile | Justfile | .dockerignore | build/* | custom/* | .github/workflows/pr-build.yml | .github/workflows/build-image.yml)
                 echo "Build input changed: ${f}"
                 build=1
                 ;;
@@ -117,3 +118,35 @@ jobs:
         run: |
           sudo podman image exists "localhost/${IMAGE_NAME}:${DEFAULT_TAG}"
           echo "Built localhost/${IMAGE_NAME}:${DEFAULT_TAG} (not pushed)." | tee -a "${GITHUB_STEP_SUMMARY}"
+
+      # Run the same package scan main's build runs (the Justfile's `sbom`
+      # recipe), but here a failure fails the check. On main the scan is
+      # non-blocking so it never stops an image from publishing, which is how
+      # #681's broken scan merged with every check green (#686). Nothing is
+      # uploaded: this job stays read-only.
+      - name: Install Syft
+        if: steps.decide.outputs.build == '1'
+        id: setup-syft
+        uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        with:
+          syft-version: v1.44.0
+
+      - name: Scan the built image
+        if: steps.decide.outputs.build == '1'
+        shell: bash
+        env:
+          SYFT_CMD: ${{ steps.setup-syft.outputs.cmd }}
+        run: |
+          set -euo pipefail
+          mkdir -p sbom-current
+          SYFT="${SYFT_CMD}" sudo -E "$(command -v just)" sbom \
+            "${IMAGE_NAME}" "${DEFAULT_TAG}" sbom-current
+          sbom="sbom-current/${IMAGE_NAME}.sbom.json"
+          count="$(jq '.packages | length' "${sbom}")"
+          echo "Package scan: ${count} packages in ${sbom}." | tee -a "${GITHUB_STEP_SUMMARY}"
+          # A Fedora Atomic image has well over 1,000 packages; a handful means
+          # the scan read the wrong thing.
+          if (( count < 500 )); then
+            echo "::error::The package scan found only ${count} packages (expected at least 500)."
+            exit 1
+          fi
