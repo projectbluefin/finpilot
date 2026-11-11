@@ -58,8 +58,13 @@ podman storage this build already used, so there is no second pull and the SBOM
 describes the exact digest that is pushed. The artifact includes an image-digest
 file. The local release-from-build.yml consumer selects a successful build whose
 artifact matches the promoted digest and stops release publication if no match
-is retained or its download fails. There is no empty-SBOM fallback on this path;
-build-time scan failures must also remain fatal.
+is retained or its download fails. There is no empty-SBOM fallback on this path.
+A build-time scan failure does not fail the build: the SBOM steps are
+`continue-on-error`, each runs only after the previous one succeeded, so the
+image is still pushed and signed, no partial artifact is uploaded, and the
+release for that digest then stops instead of shipping an empty package list.
+The artifact is kept for 90 days, because main only builds when it changes and
+the promoted build can be weeks old when the promotion PR merges.
 
 The same reusable builds the squash branch, and it stages deletions with
 `git diff --diff-filter=D`. Git reports a moved file as a rename, so a path `main`
