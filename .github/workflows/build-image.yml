@@ -221,6 +221,42 @@ jobs:
       # :stable without a stable-branch rebuild, so the upstream push-image
       # action owns all registry authentication and pushing.
 
+      # The release path downloads this artifact instead of scanning the
+      # promoted image inline. Scanning inline pulls and unpacks the ~3 GB
+      # image on a bare ubuntu-24.04 runner, where the runner is evicted
+      # before the scan finishes (finpilot #678) and the release ships an
+      # empty package list. Scan the already-built local image here: it lives
+      # in the btrfs podman storage this build already used, so syft reads the
+      # layers without a second pull and stays well under the memory limit.
+      # rpm-db-cataloger lists every Fedora package at low memory, and the
+      # SBOM describes the exact digest that is pushed below.
+      # The SBOM steps never block publishing: a failed scan only costs the
+      # SBOM (the release then refuses to publish without one), not the image.
+      - name: Install Syft
+        id: setup-syft
+        continue-on-error: true
+        uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        with:
+          syft-version: v1.44.0
+
+      - name: Generate SBOM from the built image
+        id: sbom
+        continue-on-error: true
+        shell: bash
+        env:
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          DEFAULT_TAG: ${{ env.DEFAULT_TAG }}
+          SYFT_CMD: ${{ steps.setup-syft.outputs.cmd }}
+        run: |
+          set -euo pipefail
+          mkdir -p sbom-current
+          sudo "${SYFT_CMD}" "podman:localhost/${IMAGE_NAME}:${DEFAULT_TAG}" \
+            --scope squashed \
+            --parallelism 1 \
+            --override-default-catalogers rpm-db-cataloger \
+            -o "spdx-json=sbom-current/${IMAGE_NAME}.sbom.json"
+          echo "SBOM: $(wc -c < "sbom-current/${IMAGE_NAME}.sbom.json") bytes"
+
       - name: Push to GHCR
         id: push
         uses: projectbluefin/actions/bootc-build/push-image@41992083f437357010da2ea072ef353d982ae369 # v1
@@ -229,6 +265,35 @@ jobs:
           tags: ${{ steps.branch-tags.outputs.tags }}
           default-tag: ${{ steps.branch-tags.outputs.default-tag }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Bind the SBOM to the exact digest pushed above. The release downloads
+      # this artifact and must attach the inventory to the promoted image, not
+      # the newest build (finpilot #681 review): record the pushed digest inside
+      # the artifact so the release can reject any run whose SBOM describes a
+      # different image, then upload the whole sbom-current/ directory.
+      - name: Record SBOM image digest
+        id: sbom-digest
+        if: steps.sbom.outcome == 'success'
+        continue-on-error: true
+        env:
+          IMAGE_DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          set -euo pipefail
+          [[ "${IMAGE_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]
+          printf '%s\n' "${IMAGE_DIGEST}" > sbom-current/image-digest
+
+      # Keep the artifact for 90 days: the release looks it up by the promoted
+      # digest, and main only builds when it changes, so the promoted build
+      # can be weeks old by the time a promotion PR is merged.
+      - name: Upload SBOM artifact
+        if: steps.sbom-digest.outcome == 'success'
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sbom-finpilot
+          path: sbom-current/
+          if-no-files-found: error
+          retention-days: 90
 
       # Sign and attest (SLSA Build L2 provenance)
       # Bluefin pattern: keyless OIDC signing via Fulcio.

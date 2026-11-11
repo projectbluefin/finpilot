@@ -1,0 +1,500 @@
+name: Reusable Release
+# Local copy of projectbluefin/actions/.github/workflows/reusable-release.yml
+# pinned at 41992083f437357010da2ea072ef353d982ae369 (v1). Finpilot calls this
+# only in image-release (artifact) mode. It differs from the pinned reusable in
+# three ways, all to bind the SBOM to the exact promoted image (finpilot #681):
+#   * the $/ self-repo action references below are expanded to the pinned
+#     projectbluefin/actions SHA, because this file owns no bootc-build actions;
+#   * the build run is selected by the promoted digest, resolved here via
+#     `skopeo inspect` on :stable (which equals the build's pushed digest, since
+#     build-image.yml is the sole builder of :testing and the promote copies it
+#     by digest), not by the newest successful build, so a later build cannot
+#     have its SBOM attached to an older released image;
+#   * a missing or unbound SBOM fails the run instead of falling back to an
+#     empty inventory.
+# Supports three modes:
+#   1. Image release (artifact) — find build run, download uploaded SBOM artifact, create release
+#   2. Image release (inline)   — generate SBOM inline with Syft from the live image tag, create release
+#                                  Use when the build pipeline does not upload a SBOM artifact
+#                                  (e.g. promote-from-testing weekly cadence).
+#   3. Conventional Commits release notes from a supplied tag
+
+on:
+  workflow_call:
+    # requires: any
+    inputs:
+      stream_name:
+        description: "Stream tag to release (for image-release mode, e.g. stable)"
+        default: ""
+        required: false
+        type: string
+      build_workflow:
+        description: "Workflow filename to search for the latest successful build run"
+        default: ""
+        required: false
+        type: string
+      build_branch:
+        description: "Branch to search for the latest successful build run"
+        default: ""
+        required: false
+        type: string
+      sbom_artifact:
+        description: "SBOM artifact name to download from the build run"
+        default: sbom-bluefin
+        required: false
+        type: string
+      image:
+        description: "Full GHCR image URL without tag (e.g. ghcr.io/projectbluefin/bluefin)"
+        default: ""
+        required: false
+        type: string
+      project_name:
+        description: "Project display name shown in the release"
+        default: ""
+        required: false
+        type: string
+      accent_color:
+        description: "Release card accent color"
+        default: "#0ea5e9"
+        required: false
+        type: string
+      badge_label:
+        description: "Release card badge label"
+        default: Stable
+        required: false
+        type: string
+      notable_packages:
+        description: "JSON array of notable packages for the release card"
+        default: "[]"
+        required: false
+        type: string
+      docs_url:
+        description: "URL for changelog documentation"
+        default: https://docs.projectbluefin.io/changelogs
+        required: false
+        type: string
+      enable_desktop_screenshot:
+        description: "Include testsuite desktop screenshot section in release notes"
+        default: true
+        required: false
+        type: boolean
+      cert_identity_regexp:
+        description: "cosign certificate identity regexp used in release instructions"
+        default: ""
+        required: false
+        type: string
+      tag:
+        description: "Legacy semver release tag to create (e.g. v1.2.3)"
+        default: ""
+        required: false
+        type: string
+      draft:
+        description: "Create the legacy semver release as a draft"
+        default: false
+        required: false
+        type: boolean
+      prerelease:
+        description: "Mark the legacy semver release as a pre-release"
+        default: false
+        required: false
+        type: boolean
+      cliff-config:
+        description: "Path to cliff.toml config for legacy semver releases"
+        default: cliff.toml
+        required: false
+        type: string
+      generate_sbom_inline:
+        description: >-
+          Generate SBOM inline with Syft instead of downloading from a build artifact.
+          Use when the build pipeline does not upload a SBOM artifact (e.g. the
+          weekly promote-from-testing path). When true, build_workflow and
+          build_branch are not required.
+        default: false
+        required: false
+        type: boolean
+      syft_version:
+        description: "Syft version to use when generate_sbom_inline is true"
+        default: "v1.44.0"
+        required: false
+        type: string
+      checkout_ref:
+        description: >-
+          Git ref to checkout for the release job (empty = use the calling
+          workflow's default SHA). Set to the production branch name when the
+          caller runs on a different branch (e.g. 'lts' for bluefin-lts).
+        default: ""
+        required: false
+        type: string
+      variants_json:
+        description: >
+          Optional JSON array of promoted variants passed to create-release variants-json input.
+          Each element: {"name":"image","tag":":stable","digest":"sha256:...","note":"..."}
+        required: false
+        default: ""
+        type: string
+      extra_components_json:
+        description: >
+          Optional JSON array of extra key-component rows passed to create-release
+          extra-components-json input. Each element: {"label":"Kernel (Base)","version":"..."}
+        required: false
+        default: ""
+        type: string
+permissions: {}
+
+jobs:
+  validate:
+    name: Validate release mode
+    runs-on: ubuntu-24.04
+    outputs:
+      mode: ${{ steps.validate.outputs.mode }}
+    steps:
+      - name: Determine workflow mode
+        id: validate
+        shell: bash
+        env:
+          STREAM_NAME: ${{ inputs.stream_name }}
+          BUILD_WORKFLOW: ${{ inputs.build_workflow }}
+          BUILD_BRANCH: ${{ inputs.build_branch }}
+          IMAGE: ${{ inputs.image }}
+          PROJECT_NAME: ${{ inputs.project_name }}
+          CERT_IDENTITY_REGEXP: ${{ inputs.cert_identity_regexp }}
+          TAG: ${{ inputs.tag }}
+          GENERATE_SBOM_INLINE: ${{ inputs.generate_sbom_inline }}
+        run: |
+          set -euo pipefail
+
+          image_mode=0
+          semver_mode=0
+
+          if [[ -n "${STREAM_NAME}" || -n "${BUILD_WORKFLOW}" || -n "${BUILD_BRANCH}" || -n "${IMAGE}" || -n "${PROJECT_NAME}" || -n "${CERT_IDENTITY_REGEXP}" ]]; then
+            image_mode=1
+          fi
+
+          if [[ -n "${TAG}" ]]; then
+            semver_mode=1
+          fi
+
+          if [[ "${image_mode}" -eq 1 && "${semver_mode}" -eq 1 ]]; then
+            echo "::error::Provide either image-release inputs or legacy semver tag inputs, not both"
+            exit 1
+          fi
+
+          if [[ "${image_mode}" -eq 0 && "${semver_mode}" -eq 0 ]]; then
+            echo "::error::No release mode selected"
+            exit 1
+          fi
+
+          if [[ "${image_mode}" -eq 1 ]]; then
+            inline="${GENERATE_SBOM_INLINE:-false}"
+            if [[ "${inline}" == "true" ]]; then
+              # Inline SBOM mode: build_workflow and build_branch are not needed
+              required_vars=(STREAM_NAME IMAGE PROJECT_NAME CERT_IDENTITY_REGEXP)
+            else
+              required_vars=(STREAM_NAME BUILD_WORKFLOW BUILD_BRANCH IMAGE PROJECT_NAME CERT_IDENTITY_REGEXP)
+            fi
+            for required_var in "${required_vars[@]}"; do
+              if [[ -z "${!required_var}" ]]; then
+                echo "::error::Missing required image-release input: ${required_var,,}"
+                exit 1
+              fi
+            done
+            echo "mode=image" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "mode=semver" >> "$GITHUB_OUTPUT"
+
+  normalize-image:
+    name: Normalize image reference
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      image: ${{ steps.normalize.outputs.image }}
+    steps:
+      - id: normalize
+        shell: bash
+        env:
+          INPUT_IMAGE: ${{ inputs.image }}
+        run: |
+          set -euo pipefail
+          image="${INPUT_IMAGE#docker://}"
+          echo "image=${image,,}" >> "$GITHUB_OUTPUT"
+
+  # Syft runs in its own job, on its own runner. On large bootc images the scan
+  # can exhaust the runner and get the VM shut down, which no step-level
+  # continue-on-error survives; isolated here, that loses only the SBOM, and
+  # image-release still creates the release with the minimal fallback (#681).
+  inline-sbom:
+    name: Generate ${{ inputs.stream_name }} SBOM
+    needs: [validate, normalize-image]
+    if: needs.validate.outputs.mode == 'image' && inputs.generate_sbom_inline == true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    continue-on-error: true
+    permissions:
+      contents: read
+    steps:
+      - name: Resolve image basename
+        id: image_name
+        env:
+          IMAGE: ${{ needs.normalize-image.outputs.image }}
+        run: |
+          set -euo pipefail
+          IMAGE_NAME="$(basename "${IMAGE}")"
+          echo "image_name=${IMAGE_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Free disk space for SBOM generation
+        run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+
+      - name: Install Syft
+        id: setup-syft
+        uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        with:
+          syft-version: ${{ inputs.syft_version }}
+
+      - name: Generate SBOM inline from promoted image
+        id: generate-sbom
+        env:
+          IMAGE: ${{ needs.normalize-image.outputs.image }}
+          STREAM_NAME: ${{ inputs.stream_name }}
+          IMAGE_NAME: ${{ steps.image_name.outputs.image_name }}
+          SYFT_CMD: ${{ steps.setup-syft.outputs.cmd }}
+          # Cap Go heap well below the 7 GB runner limit to leave headroom for OS + docker layers.
+          # 3 GiB triggers GC much earlier than 6 GiB; prevents runner VM shutdown on OOM.
+          GOMEMLIMIT: "3GiB"
+          GOGC: "25"
+        run: |
+          set -euo pipefail
+          mkdir -p sbom-current
+          # Scan directly from the registry — avoids skopeo copy to oci-dir which
+          # OOM-kills standard ubuntu-24.04 runners on large desktop images (exit 137).
+          # --override-default-catalogers rpm-db-cataloger replaces all default
+          # catalogers (binary, java, python, etc.) with only the RPM database reader.
+          # All notable packages in Fedora-based images are RPMs; this gives complete
+          # release-note data at <50 MB RAM vs. multi-GB for the full filesystem scan.
+          # --parallelism 1 prevents concurrent cataloger memory spikes.
+          "${SYFT_CMD}" "registry:${IMAGE}:${STREAM_NAME}" \
+            --scope squashed \
+            --parallelism 1 \
+            --override-default-catalogers rpm-db-cataloger \
+            -o "spdx-json=sbom-current/${IMAGE_NAME}.sbom.json"
+          echo "SBOM: $(wc -c < "sbom-current/${IMAGE_NAME}.sbom.json") bytes"
+
+      - name: Upload inline SBOM
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: inline-sbom-${{ inputs.stream_name }}
+          path: sbom-current/${{ steps.image_name.outputs.image_name }}.sbom.json
+          if-no-files-found: error
+          retention-days: 7
+
+  image-release:
+    name: Create ${{ inputs.stream_name }} image release
+    needs: [validate, normalize-image, inline-sbom]
+    # Runs whether inline-sbom succeeded, failed or was skipped: a lost SBOM
+    # must never cost the release.
+    if: ${{ !cancelled() && needs.validate.result == 'success' && needs.normalize-image.result == 'success' && needs.validate.outputs.mode == 'image' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      actions: read
+    environment:
+      name: production
+      url: ${{ needs.normalize-image.outputs.image }}:${{ inputs.stream_name }}
+    steps:
+      - name: Find build artifact for the promoted digest
+        id: build_run
+        if: inputs.generate_sbom_inline == false
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_WORKFLOW: ${{ inputs.build_workflow }}
+          BUILD_BRANCH: ${{ inputs.build_branch }}
+          REPOSITORY: ${{ github.repository }}
+          SBOM_ARTIFACT: ${{ inputs.sbom_artifact }}
+          IMAGE: ${{ needs.normalize-image.outputs.image }}
+          STREAM_NAME: ${{ inputs.stream_name }}
+        run: |
+          set -euo pipefail
+          # The promoted digest is what :stable points at; build-image.yml
+          # recorded the same digest in the SBOM artifact (it is the sole
+          # builder of :testing and the promote copies it by digest). Match the
+          # download on it so a build that finished after the promotion cannot
+          # have its inventory attached to this released image (finpilot #681).
+          EXPECTED_DIGEST="$(skopeo inspect --format '{{.Digest}}' \
+            "docker://${IMAGE}:${STREAM_NAME}" 2>/dev/null || echo '')"
+          if [[ -z "${EXPECTED_DIGEST}" ]]; then
+            echo "::error::Could not resolve promoted digest for ${IMAGE}:${STREAM_NAME} — refusing to release without a digest binding"
+            exit 1
+          fi
+          [[ "${EXPECTED_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]
+          runs=$(gh run list --repo "${REPOSITORY}" \
+            --workflow "${BUILD_WORKFLOW}" --branch "${BUILD_BRANCH}" \
+            --status success --limit 100 --json databaseId)
+          scratch=$(mktemp -d)
+          trap 'rm -rf -- "${scratch}"' EXIT
+          while IFS= read -r run_id; do
+            candidate="${scratch}/${run_id}"
+            if ! gh run download "${run_id}" --repo "${REPOSITORY}" \
+              --name "${SBOM_ARTIFACT}" --dir "${candidate}"; then
+              echo "::warning::Could not download SBOM from run ${run_id}"
+              continue
+            fi
+            if [[ ! -f "${candidate}/image-digest" ]]; then
+              echo "::warning::Run ${run_id} has no SBOM digest binding"
+              continue
+            fi
+            if [[ "$(<"${candidate}/image-digest")" == "${EXPECTED_DIGEST}" ]]; then
+              echo "run_id=${run_id}" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done < <(jq -r '.[].databaseId' <<<"${runs}")
+          echo "::error::No retained SBOM matches promoted digest ${EXPECTED_DIGEST}"
+          exit 1
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.checkout_ref }}
+
+      - name: Resolve release metadata
+        id: meta
+        env:
+          STREAM_NAME: ${{ inputs.stream_name }}
+          BADGE_LABEL: ${{ inputs.badge_label }}
+        run: |
+          set -euo pipefail
+          DATE="$(date -u +%Y%m%d)"
+          TAG="${STREAM_NAME}-${DATE}"
+          TITLE="${TAG}: ${BADGE_LABEL}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "title=${TITLE}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve image basename
+        id: image_name
+        env:
+          IMAGE: ${{ needs.normalize-image.outputs.image }}
+        run: |
+          set -euo pipefail
+          IMAGE_NAME="$(basename "${IMAGE}")"
+          echo "image_name=${IMAGE_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Get image digest
+        id: digest
+        env:
+          IMAGE: ${{ needs.normalize-image.outputs.image }}
+          STREAM_NAME: ${{ inputs.stream_name }}
+        run: |
+          set -euo pipefail
+          DIGEST=$(skopeo inspect --format '{{.Digest}}' \
+            "docker://${IMAGE}:${STREAM_NAME}" 2>/dev/null || echo "")
+          if [[ -z "${DIGEST}" ]]; then
+            echo "::warning::Could not fetch digest for ${IMAGE}:${STREAM_NAME} — using placeholder"
+            DIGEST="sha256:unknown"
+          fi
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+
+      - name: Download inline SBOM
+        id: download-inline-sbom
+        if: inputs.generate_sbom_inline == true
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: inline-sbom-${{ inputs.stream_name }}
+          path: sbom-current
+
+      - name: Create minimal SBOM fallback if generation failed
+        if: inputs.generate_sbom_inline == true && steps.download-inline-sbom.outcome == 'failure'
+        env:
+          IMAGE_NAME: ${{ steps.image_name.outputs.image_name }}
+          IMAGE: ${{ needs.normalize-image.outputs.image }}
+          STREAM_NAME: ${{ inputs.stream_name }}
+        run: |
+          mkdir -p sbom-current
+          # Minimal valid SPDX JSON — used when inline Syft generation fails (e.g. OOM).
+          # The release proceeds; SBOM contents will be empty but the release is not blocked.
+          cat > "sbom-current/${IMAGE_NAME}.sbom.json" << SPDXEOF
+          {"spdxVersion":"SPDX-2.3","dataLicense":"CC0-1.0","SPDXID":"SPDXRef-DOCUMENT","name":"${IMAGE_NAME}","documentNamespace":"https://github.com/projectbluefin/${IMAGE_NAME}/sbom-fallback","packages":[],"relationships":[{"spdxElementId":"SPDXRef-DOCUMENT","relationshipType":"DESCRIBES","relatedSpdxElement":"SPDXRef-DOCUMENT"}],"documentDescribes":["SPDXRef-DOCUMENT"]}
+          SPDXEOF
+          echo "WARNING: Using placeholder SBOM — inline generation failed (OOM or runner eviction)"
+
+      - name: Download SBOM artifact
+        id: download-sbom-artifact
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        if: inputs.generate_sbom_inline == false
+        continue-on-error: false
+        with:
+          name: ${{ inputs.sbom_artifact }}
+          run-id: ${{ steps.build_run.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: sbom-current
+
+      - name: Create release
+        uses: projectbluefin/actions/bootc-build/create-release@41992083f437357010da2ea072ef353d982ae369 # v1
+        with:
+          sbom-path: sbom-current/${{ steps.image_name.outputs.image_name }}.sbom.json
+          tag: ${{ steps.meta.outputs.tag }}
+          title: ${{ steps.meta.outputs.title }}
+          image: ${{ needs.normalize-image.outputs.image }}
+          digest: ${{ steps.digest.outputs.digest }}
+          repo: ${{ github.repository }}
+          project-name: ${{ inputs.project_name }}
+          accent-color: ${{ inputs.accent_color }}
+          badge-label: ${{ inputs.badge_label }}
+          sbom-filename: ${{ steps.image_name.outputs.image_name }}.spdx.json
+          cert-identity-regexp: ${{ inputs.cert_identity_regexp }}
+          notable-packages: ${{ inputs.notable_packages }}
+          docs-url: ${{ inputs.docs_url }}
+          variants-json: ${{ inputs.variants_json }}
+          extra-components-json: ${{ inputs.extra_components_json }}
+          github-token: ${{ github.token }}
+          enable-desktop-screenshot: ${{ inputs.enable_desktop_screenshot }}
+
+  semver-release:
+    name: Create release ${{ inputs.tag }}
+    needs: [validate, normalize-image]
+    if: needs.validate.outputs.mode == 'semver'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Generate release notes
+        id: release-notes
+        uses: projectbluefin/actions/bootc-build/generate-release-notes@41992083f437357010da2ea072ef353d982ae369 # v1
+        with:
+          tag: ${{ inputs.tag }}
+          output-file: CHANGELOG.md
+          config: ${{ inputs.cliff-config }}
+          github-token: ${{ github.token }}
+
+      - name: Append desktop screenshot to release notes
+        if: needs.normalize-image.outputs.image != '' && inputs.enable_desktop_screenshot
+        env:
+          IMAGE: ${{ needs.normalize-image.outputs.image }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          SLUG=$(printf '%s' "${IMAGE}" | sed -E 's|^[^/]*/[^/]*/||' | tr ':' '-')
+          cat >> CHANGELOG.md <<EOF
+
+          ## Desktop Screenshot
+
+          > Captured automatically after e2e validation.
+
+          ![${TAG}](https://projectbluefin.github.io/testsuite/screenshots/${SLUG}-smoke-latest.png)
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
+        with:
+          tag_name: ${{ inputs.tag }}
+          name: ${{ inputs.tag }}
+          body_path: CHANGELOG.md
+          draft: ${{ inputs.draft }}
+          prerelease: ${{ inputs.prerelease }}
