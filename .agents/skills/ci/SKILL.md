@@ -14,7 +14,6 @@ description: >-
 | `build-image.yml` | push to `main` or `stable`, dispatch | Builds, signs, and pushes the image. |
 | `execute-release.yml` | push to `stable` | Promotes the candidate digest. Does not rebuild. |
 | `promote-main-to-stable.yml` | daily schedule, dispatch | Opens the squash promotion PR and runs the release gate on it. |
-| `sync-stable-to-main.yml` | push to `stable` | Merges `stable` hotfixes back into `main`. |
 | `pr-validation.yml` | pull request | The `validate` check: shellcheck and hadolint. |
 | `pr-build.yml` | pull request, merge queue | The `PR image build` check: builds the image (no push, no signing) when the Containerfile, Justfile, `.dockerignore`, `build/`, `custom/` or the workflow itself changes; passes in seconds otherwise. |
 | `validate-brewfiles.yml` | pull request | Brewfiles, without evaluating them. |
@@ -43,6 +42,32 @@ runs, so it attests the current candidate. The binding comes from
 `execute-release.yml` passing `source_branch: main`, which makes the reusable
 refuse to promote at all once `main` has moved past the promotion commit; a
 manual dispatch is exempt, because that path is deliberate recovery.
+
+The release's SBOM is generated at build time, not scanned on the release run.
+`build-image.yml` installs Syft and scans the already-built local image. Syft's
+`podman:` source talks to the Podman API socket, which this rootful build has no
+rootful instance of (finpilot #683), so the image is mounted read-only with
+`podman image mount` and scanned as a directory (`dir:`) instead. That reads the
+layers from the btrfs podman storage this build already used, with no daemon and
+no second copy of the ~3 GB image, and the SBOM still describes the exact digest
+that is pushed. It catalogs with `rpm-db-cataloger`, `--parallelism 1`, and
+uploads it as the `sbom-finpilot` artifact. `execute-release.yml`'s release job passes `build_workflow:
+build-image.yml`, `build_branch: main`, and `sbom_artifact: sbom-finpilot` so it
+downloads that artifact instead of scanning the promoted image inline. Scanning
+inline pulls and unpacks the ~3 GB image on a bare ubuntu-24.04 runner, where the
+runner is evicted before the scan finishes (finpilot #678) and the release ships
+an empty package list. The build-time catalog reads the layers from the btrfs
+podman storage this build already used, so there is no second pull and the SBOM
+describes the exact digest that is pushed. The artifact includes an image-digest
+file. The local release-from-build.yml consumer selects a successful build whose
+artifact matches the promoted digest and stops release publication if no match
+is retained or its download fails. There is no empty-SBOM fallback on this path.
+A build-time scan failure does not fail the build: the SBOM steps are
+`continue-on-error`, each runs only after the previous one succeeded, so the
+image is still pushed and signed, no partial artifact is uploaded, and the
+release for that digest then stops instead of shipping an empty package list.
+The artifact is kept for 90 days, because main only builds when it changes and
+the promoted build can be weeks old when the promotion PR merges.
 
 The same reusable builds the squash branch, and it stages deletions with
 `git diff --diff-filter=D`. Git reports a moved file as a rename, so a path `main`
