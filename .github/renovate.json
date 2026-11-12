@@ -71,6 +71,15 @@
       "enabled": false
     },
     {
+      "description": "The release workflows are human-merge paths in the hive. Give their updates their own branches, so a pin-only update to them is a PR of its own that the hive's pin-only exception can merge, instead of being held with other workflows.",
+      "matchFileNames": [
+        ".github/workflows/build-image.yml",
+        ".github/workflows/execute-release.yml",
+        ".github/workflows/promote-main-to-stable.yml"
+      ],
+      "additionalBranchPrefix": "release-workflows-"
+    },
+    {
       "description": "A major crossing always waits for a human — never automerge one. Last matching rule wins, so keep this rule last.",
       "matchUpdateTypes": ["major"],
       "automerge": false
