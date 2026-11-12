@@ -2,7 +2,7 @@ export IMAGE_NAME := env("IMAGE_NAME", "finpilot")
 export DEFAULT_TAG := env("DEFAULT_TAG", "stable")
 export PODMAN := env("PODMAN", "podman")
 export REPO_ORG := env("GITHUB_REPOSITORY_OWNER", "projectbluefin")
-export bib_image := env("BIB_IMAGE", "ghcr.io/osbuild/bootc-image-builder:latest@sha256:5e99d31c1e4d7a3f89e8d8d19dfb9e86be8572e7c8c7d61a1a0988e5b1989861")
+export bib_image := env("BIB_IMAGE", "ghcr.io/osbuild/bootc-image-builder:latest@sha256:dc0d7729a92814650e2312a9a8cf3a0441dbf0e046e2a705534dffbe8dd0765f")
 export qemu_image := env("QEMU_IMAGE", "ghcr.io/qemus/qemu:7.50@sha256:e7f6fda52503a546fd649670ba46e4bc23dc6dcef275bc3fac48877fbbc430df")
 export vm_ram := env("VM_RAM", "8192")
 export vm_cpus := env("VM_CPUS", "4")
@@ -258,6 +258,49 @@ tag-images $image_name="" $default_tag="" $tags="":
     ${PODMAN} tag "${IMAGE}" "${image_name}:${default_tag}"
 
     echo "Tagged ${image_name} with: ${tags}"
+
+# Write the image's package list (an SPDX-JSON SBOM) for a locally built image.
+#
+# Arguments:
+#   $target_image - the image to scan (default: $IMAGE_NAME)
+#   $tag          - the image tag (default: $DEFAULT_TAG)
+#   $out          - the output directory (default: sbom-current)
+#
+# Writes <out>/<target_image>.sbom.json. Syft's `podman:` source talks to the
+# Podman API socket, and a rootful CI build has no rootful socket (#683), so the
+# image is mounted and scanned as a directory instead: no daemon, and no second
+# copy of the ~3 GB image. Set SYFT to the syft binary (CI passes the one that
+# download-syft installed). Run it as the user that built the image; CI builds
+# rootful, so CI runs `sudo -E just sbom`. build-image.yml and pr-build.yml both
+# call this recipe, so the PR check scans exactly the way main does (#686).
+#
+# Example: sudo -E just sbom finpilot stable
+
+# Generate the SBOM for a locally built image
+[group('Image')]
+sbom $target_image=IMAGE_NAME $tag=DEFAULT_TAG $out="sbom-current":
+    #!/usr/bin/bash
+    set -euo pipefail
+
+    syft="${SYFT:-syft}"
+    ref="localhost/${target_image}:${tag}"
+    file="${out}/${target_image}.sbom.json"
+    mkdir -p "${out}"
+
+    mnt="$(${PODMAN} image mount "${ref}")"
+    # Unmount even when the scan fails, so a failed scan leaves nothing mounted.
+    trap '${PODMAN} image unmount "${ref}" >/dev/null' EXIT
+
+    # `--scope` does not apply to `dir:`; --source-name/--source-version name
+    # the SBOM so the release notes can identify the image.
+    "${syft}" "dir:${mnt}" \
+        --source-name "${target_image}" \
+        --source-version "${tag}" \
+        --parallelism 1 \
+        --override-default-catalogers rpm-db-cataloger \
+        -o "spdx-json=${file}"
+
+    echo "SBOM: ${file}, $(wc -c <"${file}") bytes"
 
 # Make the locally built image visible to rootful podman so Bootc Image Builder
 # can read it, copying it across with `podman image scp`. Falls back to pulling

@@ -15,7 +15,7 @@ description: >-
 | `execute-release.yml` | push to `stable` | Promotes the candidate digest. Does not rebuild. |
 | `promote-main-to-stable.yml` | daily schedule, dispatch | Opens the squash promotion PR and runs the release gate on it. |
 | `pr-validation.yml` | pull request | The `validate` check: shellcheck and hadolint. |
-| `pr-build.yml` | pull request, merge queue | The `PR image build` check: builds the image (no push, no signing) when the Containerfile, Justfile, `.dockerignore`, `build/`, `custom/` or the workflow itself changes; passes in seconds otherwise. |
+| `pr-build.yml` | pull request, merge queue | The `PR image build` check: builds the image (no push, no signing) and runs the same package scan as main, failing on a broken scan, when the Containerfile, Justfile, `.dockerignore`, `build/`, `custom/`, `build-image.yml` or the workflow itself changes; passes in seconds otherwise. |
 | `validate-brewfiles.yml` | pull request | Brewfiles, without evaluating them. |
 | `validate-flatpaks.yml` | pull request | Flatpak preinstall files against Flathub. |
 | `validate-justfiles.yml` | pull request | `just check`. |
@@ -44,14 +44,25 @@ refuse to promote at all once `main` has moved past the promotion commit; a
 manual dispatch is exempt, because that path is deliberate recovery.
 
 The release's SBOM is generated at build time, not scanned on the release run.
-`build-image.yml` installs Syft and scans the already-built local image. Syft's
-`podman:` source talks to the Podman API socket, which this rootful build has no
-rootful instance of (finpilot #683), so the image is mounted read-only with
-`podman image mount` and scanned as a directory (`dir:`) instead. That reads the
-layers from the btrfs podman storage this build already used, with no daemon and
-no second copy of the ~3 GB image, and the SBOM still describes the exact digest
-that is pushed. It catalogs with `rpm-db-cataloger`, `--parallelism 1`, and
-uploads it as the `sbom-finpilot` artifact. `execute-release.yml`'s release job passes `build_workflow:
+`build-image.yml` installs Syft and scans the already-built local image with the
+Justfile's `sbom` recipe (`SYFT=<syft> sudo -E just sbom <image> <tag>
+sbom-current`). Syft's `podman:` source talks to the Podman API socket, which
+this rootful build has no rootful instance of (finpilot #683), so the recipe
+mounts the image with `podman image mount`, scans it as a directory (`dir:`),
+and unmounts it even when the scan fails. That reads the layers from the btrfs
+podman storage this build already used, with no daemon and no second copy of
+the ~3 GB image, and the SBOM still describes the exact digest that is pushed.
+It catalogs with `rpm-db-cataloger`, `--parallelism 1`, and the workflow uploads
+it as the `sbom-finpilot` artifact. Keep the Syft command in the recipe only:
+`tests/template/justfile-sbom_test.bats` fails if a workflow calls Syft
+directly.
+
+The `PR image build` check (`pr-build.yml`) runs the same recipe on the image it
+just built, and there a failed scan, or one that lists fewer than 500 packages,
+fails the check (finpilot #686). On main the scan stays non-blocking (below), so
+without the PR check a broken scan only shows up in main's build log, which is
+how #681's scan merged with every check green. `build-image.yml` is a PR build
+input for this reason, so a change to main's scan alone still builds and scans. `execute-release.yml`'s release job passes `build_workflow:
 build-image.yml`, `build_branch: main`, and `sbom_artifact: sbom-finpilot` so it
 downloads that artifact instead of scanning the promoted image inline. Scanning
 inline pulls and unpacks the ~3 GB image on a bare ubuntu-24.04 runner, where the
@@ -123,8 +134,9 @@ secrets context — `secrets` in a job-level `if` is a parse error, not a skip.
 Automerge deliberately covers GitHub Actions SHA bumps, which reverses a guard
 upstream kept. Those SHAs run in jobs holding `packages: write`,
 `id-token: write`, and `secrets: inherit`, and the PR image build runs only when
-the image's inputs change, which an action bump does not, so a bump merges with
-only shellcheck, hadolint, and the test suite having run. Putting the
+the image's inputs change, which an action bump does not (except one in
+`build-image.yml`, a build input since #686), so a bump merges with only
+shellcheck, hadolint, and the test suite having run. Putting the
 guard back is one rule — `matchManagers: ["github-actions"]` with
 `automerge: false`.
 
