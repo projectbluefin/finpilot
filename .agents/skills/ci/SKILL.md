@@ -19,7 +19,7 @@ description: >-
 | `validate-brewfiles.yml` | pull request, merge queue | The `Validate Brewfiles` check: Brewfiles, without evaluating them. |
 | `validate-flatpaks.yml` | pull request, merge queue | The `Validate Flatpaks` check: Flatpak preinstall files against Flathub. |
 | `validate-justfiles.yml` | pull request, merge queue | The `Validate Justfiles` check: `just check`. |
-| `validate-renovate.yml` | pull request, merge queue, push | The `Validate Renovate config` check: Renovate config. |
+| `validate-renovate.yml` | pull request, merge queue, push | The `Validate Renovate config / Validate Renovate config` check: Renovate config. This is a reusable-workflow caller, so GitHub reports the check context as the caller job name plus the reusable job name; use this full two-part name when setting the required check. |
 | `unit-tests.yml` | push, pull request, merge queue | The `BATS unit tests` check. |
 | `renovate.yml` | schedule, config change | Runs Renovate. |
 | `clean.yml` | schedule | Deletes images older than 90 days. |
