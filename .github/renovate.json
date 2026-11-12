@@ -27,7 +27,7 @@
   ],
   "packageRules": [
     {
-      "description": "Automerge everything short of a major when checks pass. PR checks are shellcheck + hadolint and PR builds are disabled, so this merges without an image build ever having run — the deliberate trade for zero dependency toil.",
+      "description": "Automerge everything short of a major once the required checks pass. The required checks are shellcheck, hadolint and the PR image build, so this merges only after the image has actually been built on the PR and in the merge queue — the deliberate trade for zero dependency toil.",
       "matchUpdateTypes": ["digest", "pin", "pinDigest", "patch", "minor"],
       "automerge": true,
       "automergeType": "pr",
@@ -52,14 +52,14 @@
       "enabled": false
     },
     {
-      "description": "Third-party GitHub Actions (everything except first-party projectbluefin/** and Homebrew/actions, which the rule below keeps separate) are safe to automerge once their release is three days old. The three-day minimumReleaseAge is the human-review gate that #305 asked for and that #645 confirmed: a compromised update has time to be spotted before it lands, while the project still sheds its daily dependency toil. First-party projectbluefin/** actions stay automerged immediately.",
+      "description": "Third-party GitHub Actions (everything except first-party projectbluefin/** and Homebrew/actions, which the rule below keeps separate) are safe to automerge once their release is three days old. The three-day minimumReleaseAge is the review window that #305 asked for and that #645 confirmed: a compromised update has time to be spotted before it lands, while the project still sheds its daily dependency toil. First-party projectbluefin/** actions stay automerged immediately.",
       "matchManagers": ["github-actions"],
       "matchPackageNames": ["!projectbluefin/**", "!Homebrew/actions"],
       "automerge": true,
       "minimumReleaseAge": "3 days"
     },
     {
-      "description": "Homebrew/actions tracks an unversioned moving branch and is digest-pinned to its main, so every bump imports whatever that branch currently holds. Keep it waiting for a human until it is moved to dated releases, per the #645 decision, and leave its pin and automerge block exactly as they were. This rule sits after the digest rule above so it wins for Homebrew/actions.",
+      "description": "Homebrew/actions tracks an unversioned moving branch and is digest-pinned to its main, so every bump imports whatever that branch holds. Renovate does not automerge it (the \"automerge\": false stays), and it is kept out of the three-day minimumReleaseAge rule above. The hive still merges these PRs once the required checks pass, because mergeraptor is a trusted bot and its verdict is only advisory — that is accepted, because this action only runs in validate-brewfiles.yml, which is read-only and carries no secrets. This rule sits after the digest rule above so it wins for Homebrew/actions.",
       "matchManagers": ["github-actions"],
       "matchPackageNames": ["Homebrew/actions"],
       "automerge": false
