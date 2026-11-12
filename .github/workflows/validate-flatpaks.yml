@@ -4,14 +4,10 @@ permissions:
 
 on:
   pull_request:
-    paths:
-      - "custom/flatpaks/**"
-      - "build/validate-flatpaks.sh"
-      - "tests/contract/validate-flatpaks_test.bats"
-      - "tests/fixtures/flathub.flatpakrepo"
-      - ".github/workflows/validate-flatpaks.yml"
+  merge_group:
 jobs:
   validate:
+    name: Validate Flatpaks
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
