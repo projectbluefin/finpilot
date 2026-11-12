@@ -4,13 +4,10 @@ permissions:
 
 on:
   pull_request:
-    paths:
-      - "custom/brew/**"
-      - "build/validate-brewfiles.sh"
-      - "tests/contract/validate-brewfiles_test.bats"
-      - ".github/workflows/validate-brewfiles.yml"
+  merge_group:
 jobs:
   validate:
+    name: Validate Brewfiles
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
