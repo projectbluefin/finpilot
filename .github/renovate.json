@@ -27,7 +27,7 @@
   ],
   "packageRules": [
     {
-      "description": "Automerge everything short of a major once the required checks pass. The required checks are shellcheck, hadolint and the PR image build, so this merges only after the image has actually been built on the PR and in the merge queue — the deliberate trade for zero dependency toil.",
+      "description": "Automerge everything short of a major once the required checks pass, including shellcheck, hadolint and PR image build. The image-build check runs on the PR and in the merge queue, but builds the image only when image inputs change; otherwise it passes without building — the deliberate trade for zero dependency toil.",
       "matchUpdateTypes": ["digest", "pin", "pinDigest", "patch", "minor"],
       "automerge": true,
       "automergeType": "pr",
