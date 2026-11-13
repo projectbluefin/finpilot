@@ -90,7 +90,7 @@ jobs:
 
       - name: Setup runner
         if: steps.decide.outputs.build == '1'
-        uses: projectbluefin/actions/bootc-build/setup-runner@46001bf923f11eab3a88fe1cf4540debb050516c # v1
+        uses: projectbluefin/actions/bootc-build/setup-runner@3adf1194c894fe7b1ae54e583c56306c6a2382ee # v1
         with:
           storage-backend: btrfs
           native-overlay: "true"
@@ -99,7 +99,7 @@ jobs:
 
       - name: Restore DNF cache
         if: steps.decide.outputs.build == '1'
-        uses: projectbluefin/actions/bootc-build/dnf-cache@46001bf923f11eab3a88fe1cf4540debb050516c # v1
+        uses: projectbluefin/actions/bootc-build/dnf-cache@3adf1194c894fe7b1ae54e583c56306c6a2382ee # v1
         with:
           action: restore
           cache-name: ${{ env.IMAGE_NAME }}
