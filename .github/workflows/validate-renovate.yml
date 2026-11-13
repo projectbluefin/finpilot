@@ -19,4 +19,4 @@ jobs:
     name: Validate Renovate config
     permissions:
       contents: read
-    uses: projectbluefin/actions/.github/workflows/reusable-validate-renovate.yml@3adf1194c894fe7b1ae54e583c56306c6a2382ee # v1
+    uses: projectbluefin/actions/.github/workflows/reusable-validate-renovate.yml@d1f65645c53d413462117fe1f05d00b9d9382f89 # v1
