@@ -16,11 +16,11 @@ description: >-
 | `promote-main-to-stable.yml` | daily schedule, dispatch | Opens the squash promotion PR and runs the release gate on it. |
 | `pr-validation.yml` | pull request | The `validate` check: shellcheck and hadolint. |
 | `pr-build.yml` | pull request, merge queue | The `PR image build` check: builds the image (no push, no signing) and runs the same package scan as main, failing on a broken scan, when the Containerfile, Justfile, `.dockerignore`, `build/`, `custom/`, `build-image.yml` or the workflow itself changes; passes in seconds otherwise. |
-| `validate-brewfiles.yml` | pull request | Brewfiles, without evaluating them. |
-| `validate-flatpaks.yml` | pull request | Flatpak preinstall files against Flathub. |
-| `validate-justfiles.yml` | pull request | `just check`. |
-| `validate-renovate.yml` | pull request | Renovate config. |
-| `unit-tests.yml` | push, pull request | The bats suite. |
+| `validate-brewfiles.yml` | pull request, merge queue | The `Validate Brewfiles` check: Brewfiles, without evaluating them. |
+| `validate-flatpaks.yml` | pull request, merge queue | The `Validate Flatpaks` check: Flatpak preinstall files against Flathub. |
+| `validate-justfiles.yml` | pull request, merge queue | The `Validate Justfiles` check: `just check`. |
+| `validate-renovate.yml` | pull request, merge queue, push | The `Validate Renovate config / Validate Renovate config` check: Renovate config. This is a reusable-workflow caller, so GitHub reports the check context as the caller job name plus the reusable job name; use this full two-part name when setting the required check. |
+| `unit-tests.yml` | push, pull request, merge queue | The `BATS unit tests` check. |
 | `renovate.yml` | schedule, config change | Runs Renovate. |
 | `clean.yml` | schedule | Deletes images older than 90 days. |
 
