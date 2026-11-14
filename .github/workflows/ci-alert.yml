@@ -27,6 +27,27 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
+      - name: Check whether a newer push superseded the cancellation
+        if: github.event.workflow_run.conclusion == 'cancelled' && github.event.workflow_run.event == 'push'
+        id: superseded
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          WORKFLOW_ID: ${{ github.event.workflow_run.workflow_id }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+          RUN_NUMBER: ${{ github.event.workflow_run.run_number }}
+        run: |
+          set -euo pipefail
+          newer=$(gh api --method GET --paginate --slurp \
+            "repos/${REPO}/actions/workflows/${WORKFLOW_ID}/runs" \
+            -f branch="$BRANCH" -f event=push -f per_page=100 |
+            jq -r --argjson number "$RUN_NUMBER" \
+              '[.[].workflow_runs[] | select(.event == "push" and .run_number > $number)] | max_by(.run_number) | .id // empty')
+          if [[ -n "$newer" ]]; then
+            echo "superseded by run $newer"
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Get failed jobs from the run
         if: github.event.workflow_run.conclusion != 'success'
         id: jobs
@@ -64,7 +85,7 @@ jobs:
           echo "issue_number=${ISSUE_NUM:-}" >> "$GITHUB_OUTPUT"
 
       - name: Create or reopen alert issue
-        if: github.event.workflow_run.conclusion != 'success' && (github.event.workflow_run.conclusion != 'cancelled' || steps.jobs.outputs.count != '0')
+        if: github.event.workflow_run.conclusion != 'success' && (github.event.workflow_run.conclusion != 'cancelled' || (steps.jobs.outputs.count != '0' && steps.superseded.outputs.found != 'true'))
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_URL: ${{ github.event.workflow_run.html_url }}
