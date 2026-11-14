@@ -3,12 +3,11 @@ name: Unit Tests
 on:
   pull_request:
     branches: [main, stable]
-    # Run unless the change is documentation-only. The suite reads Containerfile,
-    # Justfile, build/, custom/ and .github/, so enumerating subjects here is a
-    # second copy of that list that silently stops running the tests when a
-    # subject is missed. Ignoring only docs keeps the trigger truthful.
-    paths-ignore:
-      - "**.md"
+    # Runs on every PR, including docs-only ones, so the suite also runs in the
+    # merge queue and a maintainer can require it. The suite reads Containerfile,
+    # Justfile, build/, custom/ and .github/, so it already covers the changes a
+    # docs-only PR cannot affect; listing those paths here would be a second copy
+    # that silently stops running the tests when a subject is missed.
   push:
     branches: [main, stable]
     paths-ignore:

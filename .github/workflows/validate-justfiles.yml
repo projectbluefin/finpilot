@@ -4,12 +4,10 @@ permissions:
 
 on:
   pull_request:
-    paths:
-      - "**/*.just"
-      - "Justfile"
-      - ".github/workflows/validate-justfiles.yml"
+  merge_group:
 jobs:
   validate:
+    name: Validate Justfiles
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
