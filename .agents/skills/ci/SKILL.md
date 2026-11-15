@@ -123,6 +123,9 @@ majors wait for a pull request — except `quay.io/fedora-ostree-desktops/*`,
 where cross-major bumps do not open a PR at all (the rule is `enabled: false`).
 A Fedora major rebase for that namespace is a deliberate manual step: bump the
 tag in `Containerfile` by hand when the next major is released and validated.
+A major's pull request also gets the `needs-owner-merge` label. `automerge: false`
+only stops Renovate; a merge bot can still merge the pull request once checks pass.
+projectbluefin's hive honours that label and leaves the merge to the owner.
 
 Renovate needs the `RENOVATE_TOKEN` secret and auto-merge enabled. Both are
 onboarding steps. The secret is optional: with it unset the workflow logs a skip

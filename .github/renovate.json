@@ -80,9 +80,10 @@
       "additionalBranchPrefix": "release-workflows-"
     },
     {
-      "description": "A major crossing always waits for a human — never automerge one. Last matching rule wins, so keep this rule last.",
+      "description": "A major crossing always waits for a human — never automerge one. automerge false only stops Renovate; the hive merges trusted-bot PRs itself, so also label it needs-owner-merge (the hive's auto_merge.human_merge_labels default), which the hive never merges; only the owner's merge click lands it. Last matching rule wins, so keep this rule last.",
       "matchUpdateTypes": ["major"],
-      "automerge": false
+      "automerge": false,
+      "addLabels": ["needs-owner-merge"]
     }
   ]
 }
