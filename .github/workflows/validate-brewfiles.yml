@@ -15,7 +15,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Homebrew
-        uses: Homebrew/actions/setup-homebrew@61cb4f206b442f05f5efe126f3e7d48218f0da02 # main
+        uses: Homebrew/actions/setup-homebrew@61b401267256bb9c047d6d1481b176d5772a0ba7 # main
 
       - name: Install just
         env:
