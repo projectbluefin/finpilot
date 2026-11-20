@@ -13,9 +13,17 @@ name: Promote main to stable
 # org-maintained, and shared with the other image repos (see issues #235/#237).
 
 on:
-  push:
-    branches:
-      - main
+  # Promote only after the image has built, never on the push itself.
+  # build-image.yml also fires on push to main and publishes :testing; with a
+  # push trigger this workflow could start the release gate before this commit's
+  # build finished, so the gate verified a stale :testing image (finpilot #753).
+  # workflow_run fires after "Build and Push Image" finishes, and branches:[main]
+  # keeps it to real pushes to main. The schedule and workflow_dispatch paths are
+  # kept so the promotion still runs on its daily window and on demand.
+  workflow_run:
+    workflows: ["Build and Push Image"]
+    types: [completed]
+    branches: [main]
   schedule:
     # Default daily promotion window. Fork owners may change this cadence.
     - cron: "0 4 * * *"
@@ -39,6 +47,11 @@ concurrency:
 jobs:
   promote:
     name: Promote main to stable
+    # Gate promotion on the build. workflow_run fires on any conclusion, so skip
+    # failed or cancelled builds here; a skipped promote reports 'skipped' to the
+    # downstream jobs, which already require needs.promote.result == 'success'.
+    # Schedule and workflow_dispatch have no workflow_run, so they always run.
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     uses: projectbluefin/actions/.github/workflows/reusable-promote-squash.yml@3ab43283cb0ec8bc62aa18208ccc4978a0fd4c44 # v1
     with:
       variants: >-
