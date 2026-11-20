@@ -16,11 +16,11 @@ description: >-
 | `promote-main-to-stable.yml` | daily schedule, dispatch | Opens the squash promotion PR and runs the release gate on it. |
 | `pr-validation.yml` | pull request | The `validate` check: shellcheck and hadolint. |
 | `pr-build.yml` | pull request, merge queue | The `PR image build` check: builds the image (no push, no signing) and runs the same package scan as main, failing on a broken scan, when the Containerfile, Justfile, `.dockerignore`, `build/`, `custom/`, `build-image.yml` or the workflow itself changes; passes in seconds otherwise. |
-| `validate-brewfiles.yml` | pull request | Brewfiles, without evaluating them. |
-| `validate-flatpaks.yml` | pull request | Flatpak preinstall files against Flathub. |
-| `validate-justfiles.yml` | pull request | `just check`. |
-| `validate-renovate.yml` | pull request | Renovate config. |
-| `unit-tests.yml` | push, pull request | The bats suite. |
+| `validate-brewfiles.yml` | pull request, merge queue | The `Validate Brewfiles` check: Brewfiles, without evaluating them. |
+| `validate-flatpaks.yml` | pull request, merge queue | The `Validate Flatpaks` check: Flatpak preinstall files against Flathub. |
+| `validate-justfiles.yml` | pull request, merge queue | The `Validate Justfiles` check: `just check`. |
+| `validate-renovate.yml` | pull request, merge queue, push | The `Validate Renovate config / Validate Renovate config` check: Renovate config. This is a reusable-workflow caller, so GitHub reports the check context as the caller job name plus the reusable job name; use this full two-part name when setting the required check. |
+| `unit-tests.yml` | push, pull request, merge queue | The `BATS unit tests` check. |
 | `renovate.yml` | schedule, config change | Runs Renovate. |
 | `clean.yml` | schedule | Deletes images older than 90 days. |
 
@@ -123,6 +123,9 @@ majors wait for a pull request — except `quay.io/fedora-ostree-desktops/*`,
 where cross-major bumps do not open a PR at all (the rule is `enabled: false`).
 A Fedora major rebase for that namespace is a deliberate manual step: bump the
 tag in `Containerfile` by hand when the next major is released and validated.
+A major's pull request also gets the `needs-owner-merge` label. `automerge: false`
+only stops Renovate; a merge bot can still merge the pull request once checks pass.
+projectbluefin's hive honours that label and leaves the merge to the owner.
 
 Renovate needs the `RENOVATE_TOKEN` secret and auto-merge enabled. Both are
 onboarding steps. The secret is optional: with it unset the workflow logs a skip
