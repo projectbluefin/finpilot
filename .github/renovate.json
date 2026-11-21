@@ -71,13 +71,14 @@
       "enabled": false
     },
     {
-      "description": "The release workflows are human-merge paths in the hive. Give their updates their own branches, so a pin-only update to them is a PR of its own that the hive's pin-only exception can merge, instead of being held with other workflows.",
+      "description": "The release workflows are human-merge paths in the hive. Give their updates their own branches, so a pin-only update to them is a PR of its own that the hive's pin-only exception can merge, instead of being held with other workflows. Renovate doesn't merge these updates itself, because its own merge would skip the hive's hold on these files. The hive merges a pin-only update, and anything else, a major included, waits for a person.",
       "matchFileNames": [
         ".github/workflows/build-image.yml",
         ".github/workflows/execute-release.yml",
         ".github/workflows/promote-main-to-stable.yml"
       ],
-      "additionalBranchPrefix": "release-workflows-"
+      "additionalBranchPrefix": "release-workflows-",
+      "automerge": false
     },
     {
       "description": "A major crossing always waits for a human — never automerge one. automerge false only stops Renovate; the hive merges trusted-bot PRs itself, so also label it needs-owner-merge (the hive's auto_merge.human_merge_labels default), which the hive never merges; only the owner's merge click lands it. Last matching rule wins, so keep this rule last.",
