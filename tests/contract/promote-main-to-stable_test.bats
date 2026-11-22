@@ -267,3 +267,53 @@ origin_tree() {
 	run grep -F 'actions/runs?status=action_required' "${WORKFLOW}"
 	[ "$status" -eq 0 ]
 }
+
+@test "promote: fires after the image build, not on the push itself" {
+	# A push trigger races build-image.yml, which also builds on push to main,
+	# so the release gate could verify the :testing image from the previous
+	# commit (#753). workflow_run matches the build by its display name: if
+	# build-image.yml is ever renamed, GitHub silently stops firing this
+	# workflow, with no failed run to notice. Pin both ends of that link.
+	local build_name
+	build_name="$(sed -n 's/^name: *//p' "${REPO_ROOT}/.github/workflows/build-image.yml")"
+	[ -n "${build_name}" ]
+
+	local on_block
+	on_block="$(awk '/^on:/ { grab = 1; next } grab && /^[^ #]/ { exit } grab' "${WORKFLOW}")"
+	[ -n "${on_block}" ]
+
+	[[ "${on_block}" == *"workflows: [\"${build_name}\"]"* ]]
+	[[ "${on_block}" == *"types: [completed]"* ]]
+	[[ "${on_block}" == *"branches: [main]"* ]]
+	# The racing push trigger must not come back.
+	run grep -E '^  push:' <<<"${on_block}"
+	[ "$status" -eq 1 ]
+	# The daily window and the manual path stay.
+	[[ "${on_block}" == *"schedule:"* ]]
+	[[ "${on_block}" == *"workflow_dispatch:"* ]]
+}
+
+@test "promote: a failed or cancelled build never starts a promotion" {
+	# workflow_run fires on every conclusion. Only the promote job's own `if`
+	# keeps a red build from opening a promotion PR, while schedule and
+	# workflow_dispatch (which carry no workflow_run) must still promote.
+	local promote_if
+	promote_if="$(awk '/^  promote:/ { grab = 1; next } grab && /^  [^ #]/ { exit } grab && /^    if:/' "${WORKFLOW}")"
+	[ -n "${promote_if}" ]
+	[[ "${promote_if}" == *"github.event_name != 'workflow_run'"* ]]
+	[[ "${promote_if}" == *"github.event.workflow_run.conclusion == 'success'"* ]]
+
+	# A skipped promote must stop the chain: every job that needs promote
+	# gates on its success rather than running on 'skipped'. Checked per job,
+	# so one gated job cannot hide another that runs unconditionally.
+	run awk '
+		/^jobs:/ { in_jobs = 1; next }
+		!in_jobs { next }
+		/^  [a-z][a-z0-9-]*:/ { finish(); job = $1; needs = 0; gated = 0; next }
+		/^    needs: \[promote[],]/ { needs = 1 }
+		/^    if:/ && index($0, "needs.promote.result == \047success\047") { gated = 1 }
+		function finish() { if (needs) { checked++; if (!gated) { print "ungated: " job; bad = 1 } } }
+		END { finish(); print "checked " checked; exit bad || checked < 1 }
+	' "${WORKFLOW}"
+	[ "$status" -eq 0 ]
+}
