@@ -37,6 +37,7 @@ CI runs the same checks; running them locally only makes the pull request quiet.
 | Renovate fails on `Validate RENOVATE_TOKEN` | the token is expired or lacks the `workflow` scope | recreate the token |
 | the promotion PR never opens | `stable` does not exist | create the branch |
 | the promotion PR will not merge | `stable` requires an approval | set required approvals to 0 |
+| an issue titled `ci: testing→main promotion conflict` opens | the shared promote workflow in `projectbluefin/actions` files that fixed title for *any* failure of its promote job, conflict or not; #796 was a transient GitHub API error (`502 Bad Gateway` from `gh` after the branch was already pushed) | open the run the issue links. If the failed step is `Build and maintain squash promotion PR` with a 5xx, and `auto/promote-main-to-stable`'s tree already matches `main` (`git rev-parse origin/main^{tree} origin/auto/promote-main-to-stable^{tree}`), nothing is wrong with the branches: re-run `promote-main-to-stable.yml` from the Actions tab so the gate and check approval run on the new head. The next successful run closes the issue itself |
 | a Renovate PR waits forever | auto-merge is off | enable it in Settings |
 
 ## Runtime
