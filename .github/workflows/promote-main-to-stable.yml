@@ -52,7 +52,7 @@ jobs:
     # downstream jobs, which already require needs.promote.result == 'success'.
     # Schedule and workflow_dispatch have no workflow_run, so they always run.
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
-    uses: projectbluefin/actions/.github/workflows/reusable-promote-squash.yml@03d9862e4e82640beea35a64d578d44faf163ea9 # v1
+    uses: projectbluefin/actions/.github/workflows/reusable-promote-squash.yml@da0469cf14f4b714f3756fe66454a207459924e9 # v1
     with:
       variants: >-
         [{"image":"${{ github.event.repository.name }}"}]
@@ -265,7 +265,7 @@ jobs:
       issues: write
       packages: read
       pull-requests: write
-    uses: projectbluefin/actions/.github/workflows/reusable-release-gate.yml@03d9862e4e82640beea35a64d578d44faf163ea9 # v1
+    uses: projectbluefin/actions/.github/workflows/reusable-release-gate.yml@da0469cf14f4b714f3756fe66454a207459924e9 # v1
     with:
       repo: ${{ github.repository }}
       pr_number: ${{ needs.locate-promotion-pr.outputs.pr_number }}
