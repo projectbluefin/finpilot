@@ -166,10 +166,16 @@ mirror; the per-call timeouts only fire on inactivity.
 ## Skipped cases pass the job
 
 bats reports a skipped case as `ok … # skip`, so `unit-tests.yml` stays green
-when a whole file skips. `ubuntu-latest` has no unprivileged user namespaces, so
-a case gated on `unshare -r` never runs in CI. Stub privileged commands on PATH
-instead: `sudoif` resolves `sudo` with `command -v` and the recipes call it by
-name, so one recording stub catches both, and setting `SUDO_USER`
+when a whole file skips. Ubuntu's AppArmor restriction blocks unprivileged
+user namespaces by default. `unit-tests.yml` lifts that restriction on its
+ephemeral runner before the suite and checks that `unshare -rm` can mount a
+tmpfs; failure stops the job rather than silently skipping VM launch coverage.
+The `run-vm` cases need that isolation for tmpfs mounts over firmware paths and
+`/dev/kvm`. Check the test log for `# skip unprivileged user namespaces are
+unavailable` after changing the runner or namespace setup; none should appear.
+
+Prefer stubbing privileged commands on PATH when absolute paths do not require
+mount isolation: `sudoif` resolves `sudo` with `command -v` and the recipes call
+it by name, so one recording stub catches both, and setting `SUDO_USER`
 short-circuits `_rootful_load_image`. The installer-build file was
-namespace-gated and skipped all 24 cases until issue #660. Only the `run-vm`
-cases still need a namespace, for the tmpfs over firmware paths.
+namespace-gated and skipped all 24 cases until issue #660.
