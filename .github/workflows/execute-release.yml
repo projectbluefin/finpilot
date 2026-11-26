@@ -72,7 +72,7 @@ jobs:
       issues: write
       packages: write
       pull-requests: write
-    uses: projectbluefin/actions/.github/workflows/reusable-execute-release.yml@da0469cf14f4b714f3756fe66454a207459924e9 # v1
+    uses: projectbluefin/actions/.github/workflows/reusable-execute-release.yml@66e378ec91547d283fa077dec1282540b85256d2 # v1
     with:
       registry: ghcr.io/${{ github.repository_owner }}
       variants: >-
