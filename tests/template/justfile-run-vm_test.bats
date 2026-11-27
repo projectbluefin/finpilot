@@ -21,8 +21,9 @@
 # Two inputs are absolute paths the recipes hardcode: the OVMF firmware under
 # /usr/share and /dev/kvm. Cases that need them present run `just` inside an
 # `unshare -rm` user and mount namespace with a tmpfs over those paths; hosts
-# without unprivileged user namespaces (GitHub's ubuntu-latest among them) skip
-# those cases. Cases that need them absent skip on a host that has them.
+# without unprivileged user namespaces skip those cases. The CI job enables
+# them and checks mount isolation before running the suite. Cases that need
+# those paths absent skip on a host that has them.
 
 setup() {
 	REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../.." && pwd)"
