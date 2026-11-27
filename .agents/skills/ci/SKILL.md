@@ -131,6 +131,8 @@ The release workflows (`build-image.yml`, `execute-release.yml`, and
 and always use `automerge: false`; the hive handles their updates as human-merge
 paths, with one exception: it merges a pin-only update (a SHA or digest pin
 bump) once checks pass. Anything else, a major included, waits for a person.
+The same pin-only exception applies to hive updates, even when they are not
+Renovate pull requests.
 
 Renovate needs the `RENOVATE_TOKEN` secret and auto-merge enabled. Both are
 onboarding steps. The secret is optional: with it unset the workflow logs a skip
