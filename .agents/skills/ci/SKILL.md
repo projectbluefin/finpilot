@@ -13,7 +13,7 @@ description: >-
 |---|---|---|
 | `build-image.yml` | push to `main` or `stable`, dispatch | Builds, signs, and pushes the image. |
 | `execute-release.yml` | push to `stable` | Promotes the candidate digest. Does not rebuild. |
-| `promote-main-to-stable.yml` | daily schedule, dispatch | Opens the squash promotion PR and runs the release gate on it. |
+| `promote-main-to-stable.yml` | completed `build-image.yml` run on `main`, daily schedule, dispatch | Opens the squash promotion PR and runs the release gate on it. |
 | `pr-validation.yml` | pull request | The `validate` check: shellcheck and hadolint. |
 | `pr-build.yml` | pull request, merge queue | The `PR image build` check: builds the image (no push, no signing) and runs the same package scan as main, failing on a broken scan, when the Containerfile, Justfile, `.dockerignore`, `build/`, `custom/`, `build-image.yml` or the workflow itself changes; passes in seconds otherwise. |
 | `validate-brewfiles.yml` | pull request, merge queue | The `Validate Brewfiles` check: Brewfiles, without evaluating them. |
@@ -126,6 +126,13 @@ tag in `Containerfile` by hand when the next major is released and validated.
 A major's pull request also gets the `needs-owner-merge` label. `automerge: false`
 only stops Renovate; a merge bot can still merge the pull request once checks pass.
 projectbluefin's hive honours that label and leaves the merge to the owner.
+The release workflows (`build-image.yml`, `execute-release.yml`, and
+`promote-main-to-stable.yml`) are kept on their own `release-workflows-` branch
+and always use `automerge: false`; the hive handles their updates as human-merge
+paths, with one exception: it merges a pin-only update (a SHA or digest pin
+bump) once checks pass. Anything else, a major included, waits for a person.
+The same pin-only exception applies to hive updates, even when they are not
+Renovate pull requests.
 
 Renovate needs the `RENOVATE_TOKEN` secret and auto-merge enabled. Both are
 onboarding steps. The secret is optional: with it unset the workflow logs a skip
