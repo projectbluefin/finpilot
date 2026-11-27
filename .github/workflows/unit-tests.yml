@@ -67,6 +67,13 @@ jobs:
             -o Acquire::https::Timeout=30 \
             -o Acquire::Retries=2 \
             bats
+      - name: Allow unprivileged user namespaces
+        # Ubuntu's AppArmor restriction otherwise silently skips the VM launch
+        # tests. This setting affects only this ephemeral runner.
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          # Fail instead of accepting skipped coverage if isolation is unavailable.
+          unshare -rm sh -ec 'mount -t tmpfs tmpfs /mnt'
       - name: Run unit tests
         # `just test-unit` is the single definition of how the suite runs.
         run: just test-unit
