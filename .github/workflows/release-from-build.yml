@@ -430,7 +430,7 @@ jobs:
           path: sbom-current
 
       - name: Create release
-        uses: projectbluefin/actions/bootc-build/create-release@66e378ec91547d283fa077dec1282540b85256d2 # v1
+        uses: projectbluefin/actions/bootc-build/create-release@5b7d9119609508a908d8cba8dba9978135f78f76 # v1
         with:
           sbom-path: sbom-current/${{ steps.image_name.outputs.image_name }}.sbom.json
           tag: ${{ steps.meta.outputs.tag }}
@@ -466,7 +466,7 @@ jobs:
 
       - name: Generate release notes
         id: release-notes
-        uses: projectbluefin/actions/bootc-build/generate-release-notes@66e378ec91547d283fa077dec1282540b85256d2 # v1
+        uses: projectbluefin/actions/bootc-build/generate-release-notes@5b7d9119609508a908d8cba8dba9978135f78f76 # v1
         with:
           tag: ${{ inputs.tag }}
           output-file: CHANGELOG.md
